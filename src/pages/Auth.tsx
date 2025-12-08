@@ -1,14 +1,20 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { GraduationCap, Shield } from "lucide-react";
+import { GraduationCap, Loader2 } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, signInWithMicrosoft } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
@@ -16,11 +22,27 @@ const Auth = () => {
     }
   }, [user, loading, navigate]);
 
-  const handleMicrosoftLogin = async () => {
-    const { error } = await signInWithMicrosoft();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const { error } = isLogin 
+      ? await signIn(email, password)
+      : await signUp(email, password);
+
     if (error) {
-      toast.error("Error al iniciar sesión: " + error.message);
+      if (error.message.includes("Invalid login credentials")) {
+        toast.error("Credenciales inválidas");
+      } else if (error.message.includes("User already registered")) {
+        toast.error("Este correo ya está registrado");
+      } else {
+        toast.error(error.message);
+      }
+    } else if (!isLogin) {
+      toast.success("Cuenta creada exitosamente");
     }
+
+    setIsSubmitting(false);
   };
 
   if (loading) {
@@ -45,42 +67,60 @@ const Auth = () => {
 
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl">Bienvenido</CardTitle>
+          <CardTitle className="text-2xl">
+            {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+          </CardTitle>
           <CardDescription>
-            Inicia sesión con tu cuenta empresarial de Microsoft 365
+            {isLogin 
+              ? "Ingresa tus credenciales para continuar" 
+              : "Completa los datos para registrarte"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            onClick={handleMicrosoftLogin}
-            className="w-full gap-3"
-            size="lg"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="21"
-              height="21"
-              viewBox="0 0 21 21"
-              fill="none"
-            >
-              <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-              <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-              <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-              <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-            </svg>
-            Continuar con Microsoft 365
-          </Button>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo electrónico</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+            </Button>
+          </form>
 
-          <div className="flex items-center justify-center gap-2 pt-4 text-xs text-muted-foreground">
-            <Shield className="h-4 w-4" />
-            <span>Solo cuentas empresariales de PandaTech</span>
+          <div className="mt-4 text-center text-sm">
+            <span className="text-muted-foreground">
+              {isLogin ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-primary hover:underline font-medium"
+            >
+              {isLogin ? "Regístrate" : "Inicia sesión"}
+            </button>
           </div>
         </CardContent>
       </Card>
-
-      <p className="mt-8 text-center text-sm text-muted-foreground">
-        Al continuar, aceptas nuestros términos de servicio y política de privacidad.
-      </p>
     </div>
   );
 };
