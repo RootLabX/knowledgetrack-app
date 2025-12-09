@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      assessment_responses: {
+        Row: {
+          answered_at: string | null
+          assessment_id: string
+          id: string
+          is_correct: boolean | null
+          question_index: number
+          section: string
+          selected_answer: number | null
+        }
+        Insert: {
+          answered_at?: string | null
+          assessment_id: string
+          id?: string
+          is_correct?: boolean | null
+          question_index: number
+          section: string
+          selected_answer?: number | null
+        }
+        Update: {
+          answered_at?: string | null
+          assessment_id?: string
+          id?: string
+          is_correct?: boolean | null
+          question_index?: number
+          section?: string
+          selected_answer?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_responses_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessments: {
+        Row: {
+          completed_at: string | null
+          correct_answers: number | null
+          id: string
+          results: Json | null
+          started_at: string
+          status: string | null
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          correct_answers?: number | null
+          id?: string
+          results?: Json | null
+          started_at?: string
+          status?: string | null
+          total_questions?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          correct_answers?: number | null
+          id?: string
+          results?: Json | null
+          started_at?: string
+          status?: string | null
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           category: string
