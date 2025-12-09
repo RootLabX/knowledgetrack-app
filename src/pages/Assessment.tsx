@@ -21,6 +21,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useAchievements } from "@/hooks/useAchievements";
+import { AchievementNotification } from "@/components/gamification/AchievementNotification";
 
 interface Question {
   id: number;
@@ -142,12 +144,15 @@ const allQuestions: Question[] = [
 const Assessment = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { checkAndUnlockAchievements } = useAchievements();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [isCompleted, setIsCompleted] = useState(false);
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [existingAssessment, setExistingAssessment] = useState<any>(null);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);
+  const [showAchievementNotification, setShowAchievementNotification] = useState(false);
 
   useEffect(() => {
     checkExistingAssessment();
@@ -251,6 +256,24 @@ const Assessment = () => {
       toast.error("Error al guardar los resultados");
     } else {
       toast.success("Evaluación completada");
+
+      // Check and unlock achievements
+      const scorePercentage = Math.round((totalCorrect / allQuestions.length) * 100);
+      const sectionScores: { [key: string]: number } = {};
+      Object.entries(resultsBySection).forEach(([section, data]) => {
+        sectionScores[section] = Math.round((data.correct / data.total) * 100);
+      });
+
+      const { unlocked } = await checkAndUnlockAchievements({
+        assessmentCompleted: true,
+        assessmentScore: scorePercentage,
+        sectionScores,
+      });
+
+      if (unlocked.length > 0) {
+        setUnlockedAchievements(unlocked);
+        setShowAchievementNotification(true);
+      }
     }
 
     setSaving(false);
@@ -377,7 +400,14 @@ const Assessment = () => {
   if (isCompleted) {
     const results = calculateResults();
     return (
-      <div className="space-y-6">
+      <>
+        {showAchievementNotification && unlockedAchievements.length > 0 && (
+          <AchievementNotification
+            achievements={unlockedAchievements}
+            onClose={() => setShowAchievementNotification(false)}
+          />
+        )}
+        <div className="space-y-6">
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
@@ -435,7 +465,8 @@ const Assessment = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </>
     );
   }
 

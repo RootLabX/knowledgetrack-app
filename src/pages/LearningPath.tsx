@@ -24,6 +24,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useAchievements } from "@/hooks/useAchievements";
+import { AchievementNotification } from "@/components/gamification/AchievementNotification";
 
 interface UserCourse {
   id: string;
@@ -66,12 +68,15 @@ const SECTION_NAMES: Record<string, string> = {
 const LearningPath = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { checkAndUnlockAchievements, getCompletedCoursesCount } = useAchievements();
   const [userCourses, setUserCourses] = useState<UserCourse[]>([]);
   const [assessmentResults, setAssessmentResults] = useState<AssessmentResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<UserCourse | null>(null);
   const [newProgress, setNewProgress] = useState(0);
   const [updating, setUpdating] = useState(false);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);
+  const [showAchievementNotification, setShowAchievementNotification] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -158,6 +163,8 @@ const LearningPath = () => {
         updateData.started_at = new Date().toISOString();
       }
 
+      const isCompletingCourse = newProgress === 100 && selectedCourse.status !== "completed";
+      
       if (newProgress === 100) {
         updateData.completed_at = new Date().toISOString();
       }
@@ -170,6 +177,20 @@ const LearningPath = () => {
       if (error) throw error;
 
       toast.success("Progreso actualizado");
+
+      // Check for achievements when completing a course
+      if (isCompletingCourse) {
+        const completedCount = await getCompletedCoursesCount() + 1; // +1 because we just completed one
+        const { unlocked } = await checkAndUnlockAchievements({
+          coursesCompleted: completedCount,
+        });
+
+        if (unlocked.length > 0) {
+          setUnlockedAchievements(unlocked);
+          setShowAchievementNotification(true);
+        }
+      }
+
       setSelectedCourse(null);
       fetchData();
     } catch (error) {
@@ -235,7 +256,14 @@ const LearningPath = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      {showAchievementNotification && unlockedAchievements.length > 0 && (
+        <AchievementNotification
+          achievements={unlockedAchievements}
+          onClose={() => setShowAchievementNotification(false)}
+        />
+      )}
+      <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Mi Ruta de Aprendizaje</h1>
@@ -510,7 +538,8 @@ const LearningPath = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 };
 
