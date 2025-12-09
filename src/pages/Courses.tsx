@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Clock, Edit, Plus, Target, Trash2, Users } from "lucide-react";
+import { BookOpen, CheckCircle, Clock, Edit, Plus, Target, Trash2, Users } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,13 @@ interface Profile {
   full_name: string | null;
 }
 
+interface CourseStats {
+  [courseId: string]: {
+    assignedCount: number;
+    completedCount: number;
+  };
+}
+
 const CATEGORIES = [
   "Git y Control de Versiones",
   "SQL y Bases de Datos",
@@ -75,6 +83,7 @@ const DIFFICULTIES = [
 const Courses = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [courseStats, setCourseStats] = useState<CourseStats>({});
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -96,6 +105,7 @@ const Courses = () => {
   useEffect(() => {
     fetchCourses();
     fetchProfiles();
+    fetchCourseStats();
     checkAdminRole();
   }, [user]);
 
@@ -141,6 +151,30 @@ const Courses = () => {
     }
   };
 
+  const fetchCourseStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("user_courses")
+        .select("course_id, status");
+
+      if (error) throw error;
+
+      const stats: CourseStats = {};
+      (data || []).forEach((uc) => {
+        if (!stats[uc.course_id]) {
+          stats[uc.course_id] = { assignedCount: 0, completedCount: 0 };
+        }
+        stats[uc.course_id].assignedCount++;
+        if (uc.status === "completed") {
+          stats[uc.course_id].completedCount++;
+        }
+      });
+      setCourseStats(stats);
+    } catch (error) {
+      console.error("Error fetching course stats:", error);
+    }
+  };
+
   const handleOpenAssignDialog = (course: Course) => {
     setSelectedCourse(course);
     setSelectedUsers([]);
@@ -168,6 +202,7 @@ const Courses = () => {
       setAssignDialogOpen(false);
       setSelectedCourse(null);
       setSelectedUsers([]);
+      fetchCourseStats();
     } catch (error: any) {
       console.error("Error assigning course:", error);
       if (error.code === "23505") {
@@ -478,6 +513,51 @@ const Courses = () => {
                 )}
               </CardHeader>
               <CardContent className="mt-auto space-y-4">
+                {/* Course Stats */}
+                {isAdmin && (
+                  <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        Usuarios asignados
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {courseStats[course.id]?.assignedCount || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <CheckCircle className="h-4 w-4" />
+                        Completados
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {courseStats[course.id]?.completedCount || 0}
+                      </span>
+                    </div>
+                    {(courseStats[course.id]?.assignedCount || 0) > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Tasa de completado</span>
+                          <span>
+                            {Math.round(
+                              ((courseStats[course.id]?.completedCount || 0) /
+                                (courseStats[course.id]?.assignedCount || 1)) *
+                                100
+                            )}%
+                          </span>
+                        </div>
+                        <Progress
+                          value={
+                            ((courseStats[course.id]?.completedCount || 0) /
+                              (courseStats[course.id]?.assignedCount || 1)) *
+                            100
+                          }
+                          className="h-1.5"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {course.duration_hours && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
