@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Clock, Plus, Target } from "lucide-react";
+import { BookOpen, Clock, Plus, Target, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -35,6 +36,12 @@ interface Course {
   difficulty: string | null;
   objectives: string[] | null;
   is_active: boolean;
+}
+
+interface Profile {
+  id: string;
+  user_id: string;
+  full_name: string | null;
 }
 
 const CATEGORIES = [
@@ -58,8 +65,12 @@ const DIFFICULTIES = [
 const Courses = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newCourse, setNewCourse] = useState({
     title: "",
@@ -72,6 +83,7 @@ const Courses = () => {
 
   useEffect(() => {
     fetchCourses();
+    fetchProfiles();
     checkAdminRole();
   }, [user]);
 
@@ -101,6 +113,65 @@ const Courses = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, user_id, full_name")
+        .order("full_name", { ascending: true });
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (error) {
+      console.error("Error fetching profiles:", error);
+    }
+  };
+
+  const handleOpenAssignDialog = (course: Course) => {
+    setSelectedCourse(course);
+    setSelectedUsers([]);
+    setAssignDialogOpen(true);
+  };
+
+  const handleAssignCourse = async () => {
+    if (!selectedCourse || selectedUsers.length === 0) {
+      toast.error("Selecciona al menos un usuario");
+      return;
+    }
+
+    try {
+      const assignments = selectedUsers.map((userId) => ({
+        course_id: selectedCourse.id,
+        user_id: userId,
+        status: "assigned",
+      }));
+
+      const { error } = await supabase.from("user_courses").insert(assignments);
+
+      if (error) throw error;
+
+      toast.success(`Curso asignado a ${selectedUsers.length} usuario(s)`);
+      setAssignDialogOpen(false);
+      setSelectedCourse(null);
+      setSelectedUsers([]);
+    } catch (error: any) {
+      console.error("Error assigning course:", error);
+      if (error.code === "23505") {
+        toast.error("Algunos usuarios ya tienen este curso asignado");
+      } else {
+        toast.error("Error al asignar el curso");
+      }
+    }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   const handleCreateCourse = async () => {
@@ -347,11 +418,65 @@ const Courses = () => {
                     </ul>
                   </div>
                 )}
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleOpenAssignDialog(course)}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Asignar a Usuarios
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Assign Course Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Asignar Curso</DialogTitle>
+            <DialogDescription>
+              Selecciona los usuarios a los que deseas asignar el curso "{selectedCourse?.title}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-64 overflow-y-auto space-y-2 py-4">
+            {profiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay usuarios registrados
+              </p>
+            ) : (
+              profiles.map((profile) => (
+                <div
+                  key={profile.id}
+                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
+                  onClick={() => toggleUserSelection(profile.user_id)}
+                >
+                  <Checkbox
+                    checked={selectedUsers.includes(profile.user_id)}
+                    onCheckedChange={() => toggleUserSelection(profile.user_id)}
+                  />
+                  <span className="text-sm">
+                    {profile.full_name || "Usuario sin nombre"}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAssignCourse} disabled={selectedUsers.length === 0}>
+              Asignar ({selectedUsers.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
