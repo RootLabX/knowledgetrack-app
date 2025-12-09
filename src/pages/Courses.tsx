@@ -391,111 +391,110 @@ const Courses = () => {
           <h1 className="text-2xl font-bold text-foreground">Cursos</h1>
           <p className="text-muted-foreground">Catálogo de cursos disponibles para capacitación</p>
         </div>
-        {isAdmin && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Curso
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Crear Nuevo Curso</DialogTitle>
-                <DialogDescription>
-                  Agrega un nuevo curso al catálogo de capacitación
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="gradient">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Curso
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Curso</DialogTitle>
+              <DialogDescription>
+                Agrega un nuevo curso al catálogo de capacitación
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Título *</Label>
+                <Input
+                  id="title"
+                  value={courseForm.title}
+                  onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                  placeholder="Ej: Git Avanzado"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoría *</Label>
+                <Select
+                  value={courseForm.category}
+                  onValueChange={(value) => setCourseForm({ ...courseForm, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Título *</Label>
+                  <Label htmlFor="duration">Duración (horas)</Label>
                   <Input
-                    id="title"
-                    value={courseForm.title}
-                    onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
-                    placeholder="Ej: Git Avanzado"
+                    id="duration"
+                    type="number"
+                    value={courseForm.duration_hours}
+                    onChange={(e) =>
+                      setCourseForm({ ...courseForm, duration_hours: e.target.value })
+                    }
+                    placeholder="Ej: 8"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="category">Categoría *</Label>
+                  <Label htmlFor="difficulty">Dificultad</Label>
                   <Select
-                    value={courseForm.category}
-                    onValueChange={(value) => setCourseForm({ ...courseForm, category: value })}
+                    value={courseForm.difficulty}
+                    onValueChange={(value) => setCourseForm({ ...courseForm, difficulty: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecciona una categoría" />
+                      <SelectValue placeholder="Selecciona" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                      {DIFFICULTIES.map((diff) => (
+                        <SelectItem key={diff.value} value={diff.value}>
+                          {diff.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">Duración (horas)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={courseForm.duration_hours}
-                      onChange={(e) =>
-                        setCourseForm({ ...courseForm, duration_hours: e.target.value })
-                      }
-                      placeholder="Ej: 8"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="difficulty">Dificultad</Label>
-                    <Select
-                      value={courseForm.difficulty}
-                      onValueChange={(value) => setCourseForm({ ...courseForm, difficulty: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DIFFICULTIES.map((diff) => (
-                          <SelectItem key={diff.value} value={diff.value}>
-                            {diff.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea
-                    id="description"
-                    value={courseForm.description}
-                    onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
-                    placeholder="Describe el contenido del curso"
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="objectives">Objetivos (uno por línea)</Label>
-                  <Textarea
-                    id="objectives"
-                    value={courseForm.objectives}
-                    onChange={(e) => setCourseForm({ ...courseForm, objectives: e.target.value })}
-                    placeholder="Dominar comandos avanzados de Git&#10;Entender flujos de trabajo&#10;Resolver conflictos eficientemente"
-                    rows={4}
-                  />
-                </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => { setDialogOpen(false); resetCourseForm(); }}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreateCourse}>Crear Curso</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+              <div className="space-y-2">
+                <Label htmlFor="description">Descripción</Label>
+                <Textarea
+                  id="description"
+                  value={courseForm.description}
+                  onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                  placeholder="Describe el contenido del curso"
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="objectives">Objetivos (uno por línea)</Label>
+                <Textarea
+                  id="objectives"
+                  value={courseForm.objectives}
+                  onChange={(e) => setCourseForm({ ...courseForm, objectives: e.target.value })}
+                  placeholder="Dominar comandos avanzados de Git&#10;Entender flujos de trabajo&#10;Resolver conflictos eficientemente"
+                  rows={4}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setDialogOpen(false); resetCourseForm(); }}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateCourse}>Crear Curso</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
 
       {courses.length === 0 ? (
@@ -560,7 +559,7 @@ const Courses = () => {
                             {Math.round(
                               ((courseStats[course.id]?.completedCount || 0) /
                                 (courseStats[course.id]?.assignedCount || 1)) *
-                                100
+                              100
                             )}%
                           </span>
                         </div>

@@ -5,13 +5,16 @@ import {
   Brain,
   GraduationCap,
   Home,
+  BookOpen,
+  Brain,
+  GraduationCap,
+  Home,
   LayoutDashboard,
-  LogOut,
   Settings,
   Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useAuth } from "@/hooks/useAuth";
+import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
   SidebarContent,
@@ -24,7 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+
 
 const mainNavItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -42,7 +45,6 @@ const managementItems = [
 ];
 
 export function AppSidebar() {
-  const { signOut, user } = useAuth();
 
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -53,7 +55,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-sidebar-foreground">TechSkills</span>
-            <span className="text-xs text-muted-foreground">Plataforma de Capacitación</span>
+            <span className="text-xs text-muted-foreground">Plataforma de Capacitación Pandatech</span>
           </div>
         </div>
       </SidebarHeader>
@@ -105,31 +107,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-              <span className="text-xs font-medium text-primary">
-                {user?.email?.charAt(0).toUpperCase() || "U"}
-              </span>
-            </div>
-            <div className="flex flex-col overflow-hidden">
-              <span className="truncate text-sm font-medium text-sidebar-foreground">
-                {user?.email || "Usuario"}
-              </span>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={signOut}
-            className="w-full justify-start text-muted-foreground hover:text-destructive"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Cerrar Sesión
-          </Button>
-        </div>
-      </SidebarFooter>
+
     </Sidebar>
   );
 }
