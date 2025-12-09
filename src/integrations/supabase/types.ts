@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          criteria_type: string
+          criteria_value: number
+          description: string
+          icon: string
+          id: string
+          name: string
+          points: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          criteria_type: string
+          criteria_value?: number
+          description: string
+          icon?: string
+          id?: string
+          name: string
+          points?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          criteria_type?: string
+          criteria_value?: number
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points?: number
+        }
+        Relationships: []
+      }
       assessment_responses: {
         Row: {
           answered_at: string | null
@@ -157,6 +193,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_courses: {
         Row: {
           assigned_at: string
@@ -197,6 +262,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_objectives: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_value: number
+          description: string | null
+          due_date: string | null
+          id: string
+          objective_type: string
+          status: string
+          target_value: number
+          title: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          objective_type: string
+          status?: string
+          target_value?: number
+          title: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          objective_type?: string
+          status?: string
+          target_value?: number
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
