@@ -1,4 +1,5 @@
 import {
+  Award,
   BarChart3,
   BookOpen,
   Brain,
@@ -30,6 +31,7 @@ const mainNavItems = [
   { title: "Evaluaciones", url: "/assessment", icon: Brain },
   { title: "Cursos", url: "/courses", icon: BookOpen },
   { title: "Ruta de Aprendizaje", url: "/learning-path", icon: GraduationCap },
+  { title: "Logros", url: "/achievements", icon: Award },
 ];
 
 const managementItems = [

@@ -25,8 +25,10 @@ import {
   Users,
   AlertTriangle,
   Award,
+  LineChart,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ProgressTrendsChart, ScoreDistributionChart, SectionPerformanceChart } from "@/components/dashboard/ProgressTrendsChart";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -275,6 +277,43 @@ const AdminDashboard = () => {
     return "bg-red-500";
   };
 
+  // Generate trend data for charts (simulated based on current data)
+  const generateTrendData = (members: TeamMemberDetail[]) => {
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+    const baseAssessments = Math.max(1, stats.assessmentsCompleted);
+    const baseCourses = Math.max(1, stats.completedAssignments);
+    
+    return months.map((month, index) => {
+      const factor = (index + 1) / 6;
+      return {
+        date: month,
+        assessments: Math.round(baseAssessments * factor),
+        coursesCompleted: Math.round(baseCourses * factor),
+        avgScore: Math.round(stats.avgAssessmentScore * (0.7 + factor * 0.3)),
+      };
+    });
+  };
+
+  const generateScoreDistribution = (members: TeamMemberDetail[]) => {
+    const ranges = [
+      { range: '0-20%', min: 0, max: 20, count: 0 },
+      { range: '21-40%', min: 21, max: 40, count: 0 },
+      { range: '41-60%', min: 41, max: 60, count: 0 },
+      { range: '61-80%', min: 61, max: 80, count: 0 },
+      { range: '81-100%', min: 81, max: 100, count: 0 },
+    ];
+
+    members.forEach(member => {
+      if (member.assessment_completed && member.assessment_score !== null && member.assessment_total) {
+        const score = (member.assessment_score / member.assessment_total) * 100;
+        const range = ranges.find(r => score >= r.min && score <= r.max);
+        if (range) range.count++;
+      }
+    });
+
+    return ranges.map(r => ({ range: r.range, count: r.count }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -350,6 +389,23 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Charts Section */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ProgressTrendsChart 
+          data={generateTrendData(stats.teamMembers)} 
+        />
+        <ScoreDistributionChart 
+          data={generateScoreDistribution(stats.teamMembers)} 
+        />
+      </div>
+
+      <SectionPerformanceChart 
+        data={stats.sectionStats.map(s => ({
+          section: SECTION_NAMES[s.section] || s.section,
+          avgScore: s.avgScore
+        }))}
+      />
 
       <Tabs defaultValue="team" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-none lg:flex">

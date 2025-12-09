@@ -13,6 +13,7 @@ import Team from "./pages/Team";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/AdminDashboard";
+import Achievements from "./pages/Achievements";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -88,6 +89,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/achievements"
+              element={
+                <ProtectedRoute>
+                  <Achievements />
                 </ProtectedRoute>
               }
             />
