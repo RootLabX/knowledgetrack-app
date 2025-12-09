@@ -4,6 +4,7 @@ import {
   Brain,
   GraduationCap,
   Home,
+  LayoutDashboard,
   LogOut,
   Settings,
   Users,
@@ -34,6 +35,7 @@ const mainNavItems = [
 const managementItems = [
   { title: "Equipo", url: "/team", icon: Users },
   { title: "Reportes", url: "/reports", icon: BarChart3 },
+  { title: "Admin Dashboard", url: "/admin", icon: LayoutDashboard },
   { title: "Configuración", url: "/settings", icon: Settings },
 ];
 
