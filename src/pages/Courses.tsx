@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { BookOpen, CheckCircle, Clock, Edit, Plus, Target, Trash2, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -341,6 +342,23 @@ const Courses = () => {
     }
   };
 
+  const handleToggleActive = async (course: Course) => {
+    try {
+      const { error } = await supabase
+        .from("courses")
+        .update({ is_active: !course.is_active })
+        .eq("id", course.id);
+
+      if (error) throw error;
+
+      toast.success(course.is_active ? "Curso desactivado" : "Curso activado");
+      fetchCourses();
+    } catch (error) {
+      console.error("Error toggling course status:", error);
+      toast.error("Error al cambiar el estado del curso");
+    }
+  };
+
   const getDifficultyColor = (difficulty: string | null) => {
     switch (difficulty) {
       case "beginner":
@@ -591,31 +609,43 @@ const Courses = () => {
                   </div>
                 )}
                 {isAdmin && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleOpenAssignDialog(course)}
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Asignar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenEditDialog(course)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleOpenDeleteDialog(course)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`active-${course.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                        {course.is_active ? "Activo" : "Inactivo"}
+                      </Label>
+                      <Switch
+                        id={`active-${course.id}`}
+                        checked={course.is_active}
+                        onCheckedChange={() => handleToggleActive(course)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleOpenAssignDialog(course)}
+                      >
+                        <Users className="h-4 w-4 mr-1" />
+                        Asignar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditDialog(course)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleOpenDeleteDialog(course)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
