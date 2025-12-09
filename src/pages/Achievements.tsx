@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { AchievementCard } from "@/components/gamification/AchievementCard";
 import { ObjectiveCard } from "@/components/gamification/ObjectiveCard";
+import { Leaderboard } from "@/components/gamification/Leaderboard";
 
 interface Achievement {
   id: string;
@@ -246,8 +247,12 @@ const Achievements = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="achievements" className="space-y-4">
+      <Tabs defaultValue="leaderboard" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="leaderboard" className="gap-2">
+            <Trophy className="h-4 w-4" />
+            Ranking
+          </TabsTrigger>
           <TabsTrigger value="achievements" className="gap-2">
             <Award className="h-4 w-4" />
             Logros
@@ -257,6 +262,10 @@ const Achievements = () => {
             Objetivos
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="leaderboard">
+          <Leaderboard />
+        </TabsContent>
 
         <TabsContent value="achievements" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
