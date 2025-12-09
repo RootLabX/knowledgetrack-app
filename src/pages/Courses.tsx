@@ -22,7 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Clock, Plus, Target, Users } from "lucide-react";
+import { BookOpen, Clock, Edit, Plus, Target, Trash2, Users } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -69,10 +79,12 @@ const Courses = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [newCourse, setNewCourse] = useState({
+  const [courseForm, setCourseForm] = useState({
     title: "",
     description: "",
     category: "",
@@ -174,24 +186,35 @@ const Courses = () => {
     );
   };
 
+  const resetCourseForm = () => {
+    setCourseForm({
+      title: "",
+      description: "",
+      category: "",
+      duration_hours: "",
+      difficulty: "",
+      objectives: "",
+    });
+  };
+
   const handleCreateCourse = async () => {
-    if (!newCourse.title || !newCourse.category) {
+    if (!courseForm.title || !courseForm.category) {
       toast.error("El título y la categoría son requeridos");
       return;
     }
 
     try {
-      const objectives = newCourse.objectives
+      const objectives = courseForm.objectives
         .split("\n")
         .map((o) => o.trim())
         .filter((o) => o.length > 0);
 
       const { error } = await supabase.from("courses").insert({
-        title: newCourse.title,
-        description: newCourse.description || null,
-        category: newCourse.category,
-        duration_hours: newCourse.duration_hours ? parseInt(newCourse.duration_hours) : null,
-        difficulty: newCourse.difficulty || null,
+        title: courseForm.title,
+        description: courseForm.description || null,
+        category: courseForm.category,
+        duration_hours: courseForm.duration_hours ? parseInt(courseForm.duration_hours) : null,
+        difficulty: courseForm.difficulty || null,
         objectives: objectives.length > 0 ? objectives : null,
       });
 
@@ -199,18 +222,87 @@ const Courses = () => {
 
       toast.success("Curso creado correctamente");
       setDialogOpen(false);
-      setNewCourse({
-        title: "",
-        description: "",
-        category: "",
-        duration_hours: "",
-        difficulty: "",
-        objectives: "",
-      });
+      resetCourseForm();
       fetchCourses();
     } catch (error) {
       console.error("Error creating course:", error);
       toast.error("Error al crear el curso");
+    }
+  };
+
+  const handleOpenEditDialog = (course: Course) => {
+    setSelectedCourse(course);
+    setCourseForm({
+      title: course.title,
+      description: course.description || "",
+      category: course.category,
+      duration_hours: course.duration_hours?.toString() || "",
+      difficulty: course.difficulty || "",
+      objectives: course.objectives?.join("\n") || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateCourse = async () => {
+    if (!selectedCourse || !courseForm.title || !courseForm.category) {
+      toast.error("El título y la categoría son requeridos");
+      return;
+    }
+
+    try {
+      const objectives = courseForm.objectives
+        .split("\n")
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+
+      const { error } = await supabase
+        .from("courses")
+        .update({
+          title: courseForm.title,
+          description: courseForm.description || null,
+          category: courseForm.category,
+          duration_hours: courseForm.duration_hours ? parseInt(courseForm.duration_hours) : null,
+          difficulty: courseForm.difficulty || null,
+          objectives: objectives.length > 0 ? objectives : null,
+        })
+        .eq("id", selectedCourse.id);
+
+      if (error) throw error;
+
+      toast.success("Curso actualizado correctamente");
+      setEditDialogOpen(false);
+      setSelectedCourse(null);
+      resetCourseForm();
+      fetchCourses();
+    } catch (error) {
+      console.error("Error updating course:", error);
+      toast.error("Error al actualizar el curso");
+    }
+  };
+
+  const handleOpenDeleteDialog = (course: Course) => {
+    setSelectedCourse(course);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!selectedCourse) return;
+
+    try {
+      const { error } = await supabase
+        .from("courses")
+        .delete()
+        .eq("id", selectedCourse.id);
+
+      if (error) throw error;
+
+      toast.success("Curso eliminado correctamente");
+      setDeleteDialogOpen(false);
+      setSelectedCourse(null);
+      fetchCourses();
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      toast.error("Error al eliminar el curso");
     }
   };
 
@@ -266,16 +358,16 @@ const Courses = () => {
                   <Label htmlFor="title">Título *</Label>
                   <Input
                     id="title"
-                    value={newCourse.title}
-                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                    value={courseForm.title}
+                    onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
                     placeholder="Ej: Git Avanzado"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Categoría *</Label>
                   <Select
-                    value={newCourse.category}
-                    onValueChange={(value) => setNewCourse({ ...newCourse, category: value })}
+                    value={courseForm.category}
+                    onValueChange={(value) => setCourseForm({ ...courseForm, category: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona una categoría" />
@@ -295,9 +387,9 @@ const Courses = () => {
                     <Input
                       id="duration"
                       type="number"
-                      value={newCourse.duration_hours}
+                      value={courseForm.duration_hours}
                       onChange={(e) =>
-                        setNewCourse({ ...newCourse, duration_hours: e.target.value })
+                        setCourseForm({ ...courseForm, duration_hours: e.target.value })
                       }
                       placeholder="Ej: 8"
                     />
@@ -305,8 +397,8 @@ const Courses = () => {
                   <div className="space-y-2">
                     <Label htmlFor="difficulty">Dificultad</Label>
                     <Select
-                      value={newCourse.difficulty}
-                      onValueChange={(value) => setNewCourse({ ...newCourse, difficulty: value })}
+                      value={courseForm.difficulty}
+                      onValueChange={(value) => setCourseForm({ ...courseForm, difficulty: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona" />
@@ -325,8 +417,8 @@ const Courses = () => {
                   <Label htmlFor="description">Descripción</Label>
                   <Textarea
                     id="description"
-                    value={newCourse.description}
-                    onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                    value={courseForm.description}
+                    onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
                     placeholder="Describe el contenido del curso"
                     rows={3}
                   />
@@ -335,15 +427,15 @@ const Courses = () => {
                   <Label htmlFor="objectives">Objetivos (uno por línea)</Label>
                   <Textarea
                     id="objectives"
-                    value={newCourse.objectives}
-                    onChange={(e) => setNewCourse({ ...newCourse, objectives: e.target.value })}
+                    value={courseForm.objectives}
+                    onChange={(e) => setCourseForm({ ...courseForm, objectives: e.target.value })}
                     placeholder="Dominar comandos avanzados de Git&#10;Entender flujos de trabajo&#10;Resolver conflictos eficientemente"
                     rows={4}
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button variant="outline" onClick={() => { setDialogOpen(false); resetCourseForm(); }}>
                   Cancelar
                 </Button>
                 <Button onClick={handleCreateCourse}>Crear Curso</Button>
@@ -419,15 +511,32 @@ const Courses = () => {
                   </div>
                 )}
                 {isAdmin && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleOpenAssignDialog(course)}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Asignar a Usuarios
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleOpenAssignDialog(course)}
+                    >
+                      <Users className="h-4 w-4 mr-1" />
+                      Asignar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEditDialog(course)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleOpenDeleteDialog(course)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -477,6 +586,126 @@ const Courses = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Course Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Curso</DialogTitle>
+            <DialogDescription>
+              Modifica los detalles del curso
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Título *</Label>
+              <Input
+                id="edit-title"
+                value={courseForm.title}
+                onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                placeholder="Ej: Git Avanzado"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-category">Categoría *</Label>
+              <Select
+                value={courseForm.category}
+                onValueChange={(value) => setCourseForm({ ...courseForm, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-duration">Duración (horas)</Label>
+                <Input
+                  id="edit-duration"
+                  type="number"
+                  value={courseForm.duration_hours}
+                  onChange={(e) =>
+                    setCourseForm({ ...courseForm, duration_hours: e.target.value })
+                  }
+                  placeholder="Ej: 8"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-difficulty">Dificultad</Label>
+                <Select
+                  value={courseForm.difficulty}
+                  onValueChange={(value) => setCourseForm({ ...courseForm, difficulty: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIFFICULTIES.map((diff) => (
+                      <SelectItem key={diff.value} value={diff.value}>
+                        {diff.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Descripción</Label>
+              <Textarea
+                id="edit-description"
+                value={courseForm.description}
+                onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                placeholder="Describe el contenido del curso"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-objectives">Objetivos (uno por línea)</Label>
+              <Textarea
+                id="edit-objectives"
+                value={courseForm.objectives}
+                onChange={(e) => setCourseForm({ ...courseForm, objectives: e.target.value })}
+                placeholder="Dominar comandos avanzados de Git&#10;Entender flujos de trabajo&#10;Resolver conflictos eficientemente"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditDialogOpen(false); resetCourseForm(); setSelectedCourse(null); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateCourse}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Course Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar curso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El curso "{selectedCourse?.title}" será eliminado permanentemente junto con todas las asignaciones asociadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedCourse(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteCourse}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
