@@ -5,15 +5,10 @@ import {
   Brain,
   GraduationCap,
   Home,
-  BookOpen,
-  Brain,
-  GraduationCap,
-  Home,
   LayoutDashboard,
   Settings,
   Users,
 } from "lucide-react";
-import { NavLink } from "@/components/NavLink";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
