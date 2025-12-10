@@ -110,20 +110,10 @@ const Courses = () => {
     checkAdminRole();
   }, [user]);
 
-  const checkAdminRole = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .single();
-    setIsAdmin(!!data);
-  };
-
   const fetchCourses = async () => {
     try {
       const { data, error } = await supabase
+        .schema("mapper")
         .from("courses")
         .select("*")
         .order("created_at", { ascending: false });
@@ -142,8 +132,7 @@ const Courses = () => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name")
-        .order("full_name", { ascending: true });
+        .select("id, user_id, full_name");
 
       if (error) throw error;
       setProfiles(data || []);
@@ -155,19 +144,20 @@ const Courses = () => {
   const fetchCourseStats = async () => {
     try {
       const { data, error } = await supabase
+        .schema("mapper")
         .from("user_courses")
         .select("course_id, status");
 
       if (error) throw error;
 
       const stats: CourseStats = {};
-      (data || []).forEach((uc) => {
-        if (!stats[uc.course_id]) {
-          stats[uc.course_id] = { assignedCount: 0, completedCount: 0 };
+      data?.forEach((item) => {
+        if (!stats[item.course_id]) {
+          stats[item.course_id] = { assignedCount: 0, completedCount: 0 };
         }
-        stats[uc.course_id].assignedCount++;
-        if (uc.status === "completed") {
-          stats[uc.course_id].completedCount++;
+        stats[item.course_id].assignedCount++;
+        if (item.status === "completed") {
+          stats[item.course_id].completedCount++;
         }
       });
       setCourseStats(stats);
@@ -176,87 +166,45 @@ const Courses = () => {
     }
   };
 
-  const handleOpenAssignDialog = (course: Course) => {
-    setSelectedCourse(course);
-    setSelectedUsers([]);
-    setAssignDialogOpen(true);
-  };
-
-  const handleAssignCourse = async () => {
-    if (!selectedCourse || selectedUsers.length === 0) {
-      toast.error("Selecciona al menos un usuario");
-      return;
-    }
-
+  const checkAdminRole = async () => {
+    if (!user) return;
     try {
-      const assignments = selectedUsers.map((userId) => ({
-        course_id: selectedCourse.id,
-        user_id: userId,
-        status: "assigned",
-      }));
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
 
-      const { error } = await supabase.from("user_courses").insert(assignments);
-
-      if (error) throw error;
-
-      toast.success(`Curso asignado a ${selectedUsers.length} usuario(s)`);
-      setAssignDialogOpen(false);
-      setSelectedCourse(null);
-      setSelectedUsers([]);
-      fetchCourseStats();
-    } catch (error: any) {
-      console.error("Error assigning course:", error);
-      if (error.code === "23505") {
-        toast.error("Algunos usuarios ya tienen este curso asignado");
-      } else {
-        toast.error("Error al asignar el curso");
-      }
+      setIsAdmin(!!data);
+    } catch (error) {
+      console.error("Error checking admin role:", error);
     }
-  };
-
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
-  const resetCourseForm = () => {
-    setCourseForm({
-      title: "",
-      description: "",
-      category: "",
-      duration_hours: "",
-      difficulty: "",
-      objectives: "",
-    });
   };
 
   const handleCreateCourse = async () => {
     if (!courseForm.title || !courseForm.category) {
-      toast.error("El título y la categoría son requeridos");
+      toast.error("Por favor completa los campos obligatorios");
       return;
     }
 
     try {
-      const objectives = courseForm.objectives
-        .split("\n")
-        .map((o) => o.trim())
-        .filter((o) => o.length > 0);
-
-      const { error } = await supabase.from("courses").insert({
-        title: courseForm.title,
-        description: courseForm.description || null,
-        category: courseForm.category,
-        duration_hours: courseForm.duration_hours ? parseInt(courseForm.duration_hours) : null,
-        difficulty: courseForm.difficulty || null,
-        objectives: objectives.length > 0 ? objectives : null,
-      });
+      const { error } = await supabase
+        .schema("mapper")
+        .from("courses")
+        .insert([{
+          title: courseForm.title,
+          description: courseForm.description,
+          category: courseForm.category,
+          duration_hours: courseForm.duration_hours ? parseFloat(courseForm.duration_hours) : null,
+          difficulty: courseForm.difficulty,
+          objectives: courseForm.objectives.split("\n").filter(o => o.trim() !== ""),
+          is_active: true
+        }]);
 
       if (error) throw error;
 
-      toast.success("Curso creado correctamente");
+      toast.success("Curso creado exitosamente");
       setDialogOpen(false);
       resetCourseForm();
       fetchCourses();
@@ -264,6 +212,114 @@ const Courses = () => {
       console.error("Error creating course:", error);
       toast.error("Error al crear el curso");
     }
+  };
+
+  const handleUpdateCourse = async () => {
+    if (!selectedCourse) return;
+    if (!courseForm.title || !courseForm.category) {
+      toast.error("Por favor completa los campos obligatorios");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .schema("mapper")
+        .from("courses")
+        .update({
+          title: courseForm.title,
+          description: courseForm.description,
+          category: courseForm.category,
+          duration_hours: courseForm.duration_hours ? parseFloat(courseForm.duration_hours) : null,
+          difficulty: courseForm.difficulty,
+          objectives: courseForm.objectives.split("\n").filter(o => o.trim() !== ""),
+        })
+        .eq("id", selectedCourse.id);
+
+      if (error) throw error;
+
+      toast.success("Curso actualizado exitosamente");
+      setEditDialogOpen(false);
+      resetCourseForm();
+      setSelectedCourse(null);
+      fetchCourses();
+    } catch (error) {
+      console.error("Error updating course:", error);
+      toast.error("Error al actualizar el curso");
+    }
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!selectedCourse) return;
+
+    try {
+      const { error } = await supabase
+        .schema("mapper")
+        .from("courses")
+        .delete()
+        .eq("id", selectedCourse.id);
+
+      if (error) throw error;
+
+      toast.success("Curso eliminado exitosamente");
+      setDeleteDialogOpen(false);
+      setSelectedCourse(null);
+      fetchCourses();
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      toast.error("Error al eliminar el curso");
+    }
+  };
+
+  const handleAssignCourse = async () => {
+    if (!selectedCourse || selectedUsers.length === 0) return;
+
+    try {
+      const assignments = selectedUsers.map(userId => ({
+        user_id: userId,
+        course_id: selectedCourse.id,
+        status: 'assigned',
+        progress: 0,
+        assigned_at: new Date().toISOString()
+      }));
+
+      const { error } = await supabase
+        .schema("mapper")
+        .from("user_courses")
+        .insert(assignments);
+
+      if (error) throw error;
+
+      toast.success(`Curso asignado a ${selectedUsers.length} usuarios`);
+      setAssignDialogOpen(false);
+      setSelectedUsers([]);
+      fetchCourseStats();
+    } catch (error) {
+      console.error("Error assigning course:", error);
+      toast.error("Error al asignar el curso");
+    }
+  };
+
+  const handleToggleActive = async (course: Course) => {
+    try {
+      const { error } = await supabase
+        .schema("mapper")
+        .from("courses")
+        .update({ is_active: !course.is_active })
+        .eq("id", course.id);
+
+      if (error) throw error;
+
+      toast.success(`Curso ${course.is_active ? "desactivado" : "activado"} exitosamente`);
+      fetchCourses();
+    } catch (error) {
+      console.error("Error toggling course status:", error);
+      toast.error("Error al cambiar el estado del curso");
+    }
+  };
+
+  const handleOpenAssignDialog = (course: Course) => {
+    setSelectedCourse(course);
+    setAssignDialogOpen(true);
   };
 
   const handleOpenEditDialog = (course: Course) => {
@@ -279,84 +335,28 @@ const Courses = () => {
     setEditDialogOpen(true);
   };
 
-  const handleUpdateCourse = async () => {
-    if (!selectedCourse || !courseForm.title || !courseForm.category) {
-      toast.error("El título y la categoría son requeridos");
-      return;
-    }
-
-    try {
-      const objectives = courseForm.objectives
-        .split("\n")
-        .map((o) => o.trim())
-        .filter((o) => o.length > 0);
-
-      const { error } = await supabase
-        .from("courses")
-        .update({
-          title: courseForm.title,
-          description: courseForm.description || null,
-          category: courseForm.category,
-          duration_hours: courseForm.duration_hours ? parseInt(courseForm.duration_hours) : null,
-          difficulty: courseForm.difficulty || null,
-          objectives: objectives.length > 0 ? objectives : null,
-        })
-        .eq("id", selectedCourse.id);
-
-      if (error) throw error;
-
-      toast.success("Curso actualizado correctamente");
-      setEditDialogOpen(false);
-      setSelectedCourse(null);
-      resetCourseForm();
-      fetchCourses();
-    } catch (error) {
-      console.error("Error updating course:", error);
-      toast.error("Error al actualizar el curso");
-    }
-  };
-
   const handleOpenDeleteDialog = (course: Course) => {
     setSelectedCourse(course);
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteCourse = async () => {
-    if (!selectedCourse) return;
-
-    try {
-      const { error } = await supabase
-        .from("courses")
-        .delete()
-        .eq("id", selectedCourse.id);
-
-      if (error) throw error;
-
-      toast.success("Curso eliminado correctamente");
-      setDeleteDialogOpen(false);
-      setSelectedCourse(null);
-      fetchCourses();
-    } catch (error) {
-      console.error("Error deleting course:", error);
-      toast.error("Error al eliminar el curso");
-    }
+  const resetCourseForm = () => {
+    setCourseForm({
+      title: "",
+      description: "",
+      category: "",
+      duration_hours: "",
+      difficulty: "",
+      objectives: "",
+    });
   };
 
-  const handleToggleActive = async (course: Course) => {
-    try {
-      const { error } = await supabase
-        .from("courses")
-        .update({ is_active: !course.is_active })
-        .eq("id", course.id);
-
-      if (error) throw error;
-
-      toast.success(course.is_active ? "Curso desactivado" : "Curso activado");
-      fetchCourses();
-    } catch (error) {
-      console.error("Error toggling course status:", error);
-      toast.error("Error al cambiar el estado del curso");
-    }
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   const getDifficultyColor = (difficulty: string | null) => {

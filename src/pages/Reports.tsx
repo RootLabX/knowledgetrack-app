@@ -39,21 +39,28 @@ const Reports = () => {
 
   const fetchReportData = async () => {
     try {
-      // Fetch profiles count
-      const { count: usersCount } = await supabase
+      // Fetch users count
+      const { count: usersCount, error: usersError } = await supabase
         .from("profiles")
         .select("*", { count: "exact", head: true });
 
-      // Fetch courses
-      const { data: courses } = await supabase
-        .from("courses")
-        .select("id, title, category")
-        .eq("is_active", true);
+      if (usersError) throw usersError;
 
-      // Fetch user courses
-      const { data: userCourses } = await supabase
+      // Fetch courses
+      const { data: courses, error: coursesError } = await supabase
+        .from("courses")
+        .select("*")
+        .schema("mapper");
+
+      if (coursesError) throw coursesError;
+
+      // Fetch user courses (assignments)
+      const { data: userCourses, error: userCoursesError } = await supabase
         .from("user_courses")
-        .select("course_id, status");
+        .select("*")
+        .schema("mapper");
+
+      if (userCoursesError) throw userCoursesError;
 
       // Calculate stats
       const coursesByCategory = (courses || []).reduce((acc: { [key: string]: number }, course) => {

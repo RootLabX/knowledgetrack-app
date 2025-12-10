@@ -1,8 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
-interface Achievement {
+export interface Achievement {
   id: string;
   name: string;
   description: string;
@@ -13,130 +14,170 @@ interface Achievement {
   criteria_value: number;
 }
 
-interface CheckResult {
-  unlocked: Achievement[];
-  alreadyEarned: string[];
+export interface UserAchievement {
+  id: string;
+  user_id: string;
+  achievement_id: string;
+  earned_at: string;
+  achievement?: Achievement;
+}
+
+interface CheckContext {
+  assessmentScore?: number; // percentage 0-100
+  assessmentCompleted?: boolean;
+  coursesCompleted?: number;
+  sectionScores?: { [section: string]: number }; // percentage per section
 }
 
 export const useAchievements = () => {
   const { user } = useAuth();
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([]);
 
-  const checkAndUnlockAchievements = useCallback(async (
-    context: {
-      assessmentScore?: number; // percentage 0-100
-      assessmentCompleted?: boolean;
-      coursesCompleted?: number;
-      sectionScores?: { [section: string]: number }; // percentage per section
+  const fetchAchievements = useCallback(async () => {
+    if (!user) return;
+
+    const { data: achievementsData, error: achievementsError } = await supabase
+      .from("achievements")
+      .select("*")
+      .schema("mapper");
+
+    if (achievementsError) {
+      console.error("Error fetching achievements:", achievementsError);
+      return;
     }
-  ): Promise<CheckResult> => {
-    if (!user) return { unlocked: [], alreadyEarned: [] };
 
-    try {
-      // Get all achievements
-      const { data: achievements } = await supabase
-        .from("achievements")
-        .select("*");
+    setAchievements(achievementsData || []);
 
-      // Get user's already earned achievements
-      const { data: earnedAchievements } = await supabase
-        .from("user_achievements")
-        .select("achievement_id")
-        .eq("user_id", user.id);
+    const { data: userAchievementsData, error: userAchievementsError } = await supabase
+      .from("user_achievements")
+      .select("*, achievement:achievements(*)")
+      .eq("user_id", user.id)
+      .schema("mapper");
 
-      const earnedIds = new Set((earnedAchievements || []).map(ea => ea.achievement_id));
-      const unlocked: Achievement[] = [];
+    if (userAchievementsError) {
+      console.error("Error fetching user achievements:", userAchievementsError);
+      return;
+    }
 
-      for (const achievement of (achievements || [])) {
-        // Skip if already earned
-        if (earnedIds.has(achievement.id)) continue;
+    setUserAchievements(userAchievementsData || []);
+  }, [user]);
 
-        let shouldUnlock = false;
+  useEffect(() => {
+    fetchAchievements();
+  }, [fetchAchievements]);
 
-        switch (achievement.criteria_type) {
-          case "first_assessment":
-            if (context.assessmentCompleted) {
-              shouldUnlock = true;
-            }
-            break;
+  const checkAndUnlockAchievements = useCallback(async (context: CheckContext) => {
+    if (!user || achievements.length === 0) return;
 
-          case "assessment_score":
-            if (context.assessmentScore !== undefined && 
-                context.assessmentScore >= achievement.criteria_value) {
-              shouldUnlock = true;
-            }
-            break;
+    const earnedAchievementIds = new Set(userAchievements.map(ua => ua.achievement_id));
+    const newUnlocked: Achievement[] = [];
 
-          case "first_course":
-            if (context.coursesCompleted !== undefined && context.coursesCompleted >= 1) {
-              shouldUnlock = true;
-            }
-            break;
+    for (const achievement of achievements) {
+      if (earnedAchievementIds.has(achievement.id)) continue;
 
-          case "courses_completed":
-            if (context.coursesCompleted !== undefined && 
-                context.coursesCompleted >= achievement.criteria_value) {
-              shouldUnlock = true;
-            }
-            break;
+      let unlocked = false;
 
-          case "section_perfect":
-            // Check if any section has 100%
-            if (context.sectionScores) {
-              const hasPerfect = Object.values(context.sectionScores).some(score => score === 100);
-              if (hasPerfect) {
-                shouldUnlock = true;
-              }
-            }
-            break;
-
-          case "section_score":
-            // Check if teamwork section >= 80%
-            if (context.sectionScores && context.sectionScores.teamwork >= achievement.criteria_value) {
-              shouldUnlock = true;
-            }
-            break;
-        }
-
-        if (shouldUnlock) {
-          // Insert the achievement
-          const { error } = await supabase
-            .from("user_achievements")
-            .insert({
-              user_id: user.id,
-              achievement_id: achievement.id,
-            });
-
-          if (!error) {
-            unlocked.push(achievement);
+      switch (achievement.criteria_type) {
+        case "first_assessment":
+          if (context.assessmentCompleted) unlocked = true;
+          break;
+        case "assessment_score":
+          if (context.assessmentScore !== undefined && context.assessmentScore >= achievement.criteria_value) {
+            unlocked = true;
           }
-        }
+          break;
+        case "first_course":
+          if (context.coursesCompleted !== undefined && context.coursesCompleted >= 1) {
+            unlocked = true;
+          }
+          break;
+        case "courses_completed":
+          if (context.coursesCompleted !== undefined && context.coursesCompleted >= achievement.criteria_value) {
+            unlocked = true;
+          }
+          break;
+        case "section_perfect":
+          // Check if any section has 100% and matches the achievement requirement if specific?
+          // The migration implies specific sections like 'Git Master' for 'Git' section.
+          // We need to match section name.
+          // For now, let's assume the achievement description or name might hint, or we need a mapping.
+          // Looking at migration: 'Git Master' -> 'Git', 'SQL Expert' -> 'SQL'.
+          // The criteria_type is 'section_perfect', but how do we know WHICH section?
+          // Maybe we check if ANY section matches? Or we need a mapping.
+          // Let's look at the migration again.
+          // ('Git Master', ..., 'section_perfect', 1)
+          // It doesn't explicitly link to 'Git' section in a machine readable way other than maybe name?
+          // Actually, let's check if I can infer it.
+          // For now, I will implement a simple check: if the achievement name contains the section name.
+          if (context.sectionScores) {
+            // This is tricky without a proper mapping column. 
+            // I'll skip this specific logic for now or make it generic if I can.
+            // Wait, the migration has:
+            // ('Git Master', ..., 'section_perfect', 1)
+            // ('SQL Expert', ..., 'section_perfect', 1)
+            // ('Arquitecto', ..., 'section_perfect', 1) -> Patrones de Diseño?
+
+            // I'll try to match based on some keywords if possible, or just skip for now to avoid errors.
+            // Actually, I can check if context.sectionScores has any 100.
+            // But that would unlock all 'section_perfect' achievements at once if I'm not careful.
+
+            // Let's assume for now we only check generic ones or I'll leave a TODO.
+            // Or better, I'll check if the achievement name contains the section key.
+            Object.entries(context.sectionScores).forEach(([section, score]) => {
+              if (score === 100 && achievement.name.toLowerCase().includes(section.toLowerCase())) {
+                unlocked = true;
+              }
+              // Special case for 'Arquitecto' -> 'Patrones'
+              if (score === 100 && achievement.name === 'Arquitecto' && section.includes('Patrones')) {
+                unlocked = true;
+              }
+            });
+          }
+          break;
+        case "section_score":
+          if (context.sectionScores) {
+            Object.entries(context.sectionScores).forEach(([section, score]) => {
+              if (score >= achievement.criteria_value && achievement.name.toLowerCase().includes(section.toLowerCase())) {
+                unlocked = true;
+              }
+              if (score >= achievement.criteria_value && achievement.name === 'Colaborador' && section.includes('Trabajo en Equipo')) {
+                unlocked = true;
+              }
+            });
+          }
+          break;
       }
 
-      return {
-        unlocked,
-        alreadyEarned: Array.from(earnedIds),
-      };
-    } catch (error) {
-      console.error("Error checking achievements:", error);
-      return { unlocked: [], alreadyEarned: [] };
+      if (unlocked) {
+        const { error } = await supabase
+          .from("user_achievements")
+          .insert({
+            user_id: user.id,
+            achievement_id: achievement.id
+          })
+          .schema("mapper");
+
+        if (!error) {
+          newUnlocked.push(achievement);
+          toast.success(`¡Logro Desbloqueado: ${achievement.name}!`, {
+            description: achievement.description,
+            icon: achievement.icon === 'award' ? '🏆' : '⭐' // Simple mapping
+          });
+        }
+      }
     }
-  }, [user]);
 
-  const getCompletedCoursesCount = useCallback(async (): Promise<number> => {
-    if (!user) return 0;
+    if (newUnlocked.length > 0) {
+      fetchAchievements();
+    }
 
-    const { data, error } = await supabase
-      .from("user_courses")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "completed");
-
-    if (error) return 0;
-    return data?.length || 0;
-  }, [user]);
+    return newUnlocked;
+  }, [user, achievements, userAchievements, fetchAchievements]);
 
   return {
-    checkAndUnlockAchievements,
-    getCompletedCoursesCount,
+    achievements,
+    userAchievements,
+    checkAndUnlockAchievements
   };
 };

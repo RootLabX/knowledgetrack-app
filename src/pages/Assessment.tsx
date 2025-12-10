@@ -155,59 +155,46 @@ const Assessment = () => {
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
 
   useEffect(() => {
-    checkExistingAssessment();
+    const fetchAssessment = async () => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .schema("mapper")
+          .from("assessments")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (data) setExistingAssessment(data);
+      } catch (error) {
+        console.error("Error fetching assessment:", error);
+      }
+    };
+
+    fetchAssessment();
   }, [user]);
 
-  const checkExistingAssessment = async () => {
-    if (!user) return;
-
-    const { data } = await supabase
-      .from("assessments")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("status", "completed")
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      setExistingAssessment(data);
-    }
-  };
-
-  const startNewAssessment = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("assessments")
-      .insert({
-        user_id: user.id,
-        total_questions: allQuestions.length,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error al iniciar la evaluación");
-      return;
-    }
-
-    setAssessmentId(data.id);
+  const startNewAssessment = () => {
     setExistingAssessment(null);
-    setAnswers({});
     setCurrentQuestion(0);
+    setAnswers({});
     setIsCompleted(false);
+    setAssessmentId(crypto.randomUUID());
   };
 
   const handleAnswer = (value: string) => {
     setAnswers({ ...answers, [currentQuestion]: parseInt(value) });
   };
 
-  const handleNext = async () => {
+  const handleNext = () => {
     if (currentQuestion < allQuestions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      await completeAssessment();
+      finishAssessment();
     }
   };
 
@@ -217,67 +204,48 @@ const Assessment = () => {
     }
   };
 
-  const completeAssessment = async () => {
-    if (!assessmentId || !user) {
-      setIsCompleted(true);
-      return;
-    }
-
+  const finishAssessment = async () => {
     setSaving(true);
+    const results = calculateResults();
 
-    // Calculate results by section
-    const resultsBySection: Record<string, { correct: number; total: number }> = {};
-    let totalCorrect = 0;
+    try {
+      // Save to Supabase
+      const { error } = await supabase
+        .schema("mapper")
+        .from("assessments")
+        .insert([{
+          user_id: user?.id,
+          total_questions: results.total,
+          correct_answers: results.correct,
+          status: "completed",
+          results: results.bySection,
+          completed_at: new Date().toISOString()
+        }]);
 
-    allQuestions.forEach((q, idx) => {
-      if (!resultsBySection[q.section]) {
-        resultsBySection[q.section] = { correct: 0, total: 0 };
-      }
-      resultsBySection[q.section].total++;
+      if (error) throw error;
 
-      if (answers[idx] === q.correctAnswer) {
-        totalCorrect++;
-        resultsBySection[q.section].correct++;
-      }
-    });
-
-    // Save assessment results
-    const { error } = await supabase
-      .from("assessments")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        correct_answers: totalCorrect,
-        results: resultsBySection,
-      })
-      .eq("id", assessmentId);
-
-    if (error) {
-      toast.error("Error al guardar los resultados");
-    } else {
-      toast.success("Evaluación completada");
-
-      // Check and unlock achievements
-      const scorePercentage = Math.round((totalCorrect / allQuestions.length) * 100);
-      const sectionScores: { [key: string]: number } = {};
-      Object.entries(resultsBySection).forEach(([section, data]) => {
-        sectionScores[section] = Math.round((data.correct / data.total) * 100);
-      });
-
-      const { unlocked } = await checkAndUnlockAchievements({
+      // Check achievements
+      const unlocked = await checkAndUnlockAchievements({
         assessmentCompleted: true,
-        assessmentScore: scorePercentage,
-        sectionScores,
+        assessmentScore: results.percentage,
+        sectionScores: Object.fromEntries(
+          Object.entries(results.bySection).map(([k, v]) => [k, v.percentage])
+        )
       });
 
-      if (unlocked.length > 0) {
+      if (unlocked && unlocked.length > 0) {
         setUnlockedAchievements(unlocked);
         setShowAchievementNotification(true);
       }
-    }
 
-    setSaving(false);
-    setIsCompleted(true);
+      setIsCompleted(true);
+      toast.success("Evaluación guardada exitosamente");
+    } catch (error) {
+      console.error("Error saving assessment:", error);
+      toast.error("Error al guardar la evaluación");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const calculateResults = () => {
@@ -408,63 +376,63 @@ const Assessment = () => {
           />
         )}
         <div className="space-y-6">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
-              <CheckCircle2 className="h-8 w-8 text-accent-foreground" />
-            </div>
-            <CardTitle className="text-2xl">¡Evaluación Completada!</CardTitle>
-            <CardDescription>Aquí están tus resultados detallados</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-center">
-              <div className="text-5xl font-bold text-primary">{results.percentage}%</div>
-              <p className="mt-2 text-muted-foreground">
-                {results.correct} de {results.total} respuestas correctas
-              </p>
-            </div>
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
+                <CheckCircle2 className="h-8 w-8 text-accent-foreground" />
+              </div>
+              <CardTitle className="text-2xl">¡Evaluación Completada!</CardTitle>
+              <CardDescription>Aquí están tus resultados detallados</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center">
+                <div className="text-5xl font-bold text-primary">{results.percentage}%</div>
+                <p className="mt-2 text-muted-foreground">
+                  {results.correct} de {results.total} respuestas correctas
+                </p>
+              </div>
 
-            <Progress value={results.percentage} className="h-3" />
+              <Progress value={results.percentage} className="h-3" />
 
-            <div className="space-y-4">
-              <h3 className="font-semibold">Resultados por Sección</h3>
-              {SECTIONS.map((section) => {
-                const sectionResult = results.bySection[section.id];
-                return (
-                  <div key={section.id} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <section.icon className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-foreground">{section.name}</span>
+              <div className="space-y-4">
+                <h3 className="font-semibold">Resultados por Sección</h3>
+                {SECTIONS.map((section) => {
+                  const sectionResult = results.bySection[section.id];
+                  return (
+                    <div key={section.id} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <section.icon className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-foreground">{section.name}</span>
+                        </div>
+                        <Badge
+                          variant={
+                            sectionResult?.percentage >= 70
+                              ? "default"
+                              : sectionResult?.percentage >= 50
+                                ? "secondary"
+                                : "destructive"
+                          }
+                        >
+                          {sectionResult?.percentage || 0}%
+                        </Badge>
                       </div>
-                      <Badge
-                        variant={
-                          sectionResult?.percentage >= 70
-                            ? "default"
-                            : sectionResult?.percentage >= 50
-                            ? "secondary"
-                            : "destructive"
-                        }
-                      >
-                        {sectionResult?.percentage || 0}%
-                      </Badge>
+                      <Progress value={sectionResult?.percentage || 0} className="h-2" />
                     </div>
-                    <Progress value={sectionResult?.percentage || 0} className="h-2" />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            <div className="flex gap-3 pt-4">
-              <Button onClick={() => navigate("/learning-path")} className="flex-1">
-                Ver Ruta de Aprendizaje
-              </Button>
-              <Button onClick={() => navigate("/")} variant="outline" className="flex-1">
-                Volver al Inicio
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex gap-3 pt-4">
+                <Button onClick={() => navigate("/learning-path")} className="flex-1">
+                  Ver Ruta de Aprendizaje
+                </Button>
+                <Button onClick={() => navigate("/")} variant="outline" className="flex-1">
+                  Volver al Inicio
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </>
     );
@@ -536,8 +504,8 @@ const Assessment = () => {
               {saving
                 ? "Guardando..."
                 : currentQuestion === allQuestions.length - 1
-                ? "Finalizar"
-                : "Siguiente"}
+                  ? "Finalizar"
+                  : "Siguiente"}
             </Button>
           </div>
         </CardContent>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,74 +55,86 @@ const Achievements = () => {
     due_date: "",
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
     try {
       // Fetch all achievements
-      const { data: allAchievements } = await supabase
+      const { data: allAchievements, error: achievementsError } = await supabase
         .from("achievements")
         .select("*")
-        .order("points", { ascending: true });
+        .schema("mapper");
 
-      // Fetch user's earned achievements
-      const { data: earnedAchievements } = await supabase
+      if (achievementsError) throw achievementsError;
+
+      // Fetch user earned achievements
+      const { data: userAchievements, error: userAchievementsError } = await supabase
         .from("user_achievements")
         .select("achievement_id, earned_at")
-        .eq("user_id", user!.id);
+        .eq("user_id", user.id)
+        .schema("mapper");
 
-      const earnedMap = new Map(
-        (earnedAchievements || []).map((ea) => [ea.achievement_id, ea.earned_at])
-      );
+      if (userAchievementsError) throw userAchievementsError;
 
-      const processedAchievements = (allAchievements || []).map((a) => ({
+      // Map earned status
+      const earnedMap = new Map(userAchievements?.map(ua => [ua.achievement_id, ua.earned_at]));
+
+      const processedAchievements = (allAchievements || []).map(a => ({
         ...a,
         earned: earnedMap.has(a.id),
-        earned_at: earnedMap.get(a.id),
+        earned_at: earnedMap.get(a.id)
       }));
 
       setAchievements(processedAchievements);
-      setTotalPoints(
-        processedAchievements
-          .filter((a) => a.earned)
-          .reduce((acc, a) => acc + a.points, 0)
-      );
+
+      // Calculate total points
+      const points = processedAchievements
+        .filter(a => a.earned)
+        .reduce((sum, a) => sum + a.points, 0);
+      setTotalPoints(points);
 
       // Fetch user objectives
-      const { data: userObjectives } = await supabase
+      const { data: userObjectives, error: objectivesError } = await supabase
         .from("user_objectives")
         .select("*")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false });
+        .eq("user_id", user.id)
+        .schema("mapper");
+
+      if (objectivesError) throw objectivesError;
 
       setObjectives(userObjectives || []);
+
     } catch (error) {
-      console.error("Error fetching achievements:", error);
-      toast.error("Error al cargar logros");
+      console.error("Error fetching data:", error);
+      toast.error("Error al cargar datos");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleCreateObjective = async () => {
-    if (!newObjective.title || newObjective.target_value < 1) {
-      toast.error("Completa todos los campos requeridos");
+    if (!user) return;
+    if (!newObjective.title) {
+      toast.error("El título es obligatorio");
       return;
     }
 
     try {
-      const { error } = await supabase.from("user_objectives").insert({
-        user_id: user!.id,
-        title: newObjective.title,
-        description: newObjective.description || null,
-        target_value: newObjective.target_value,
-        objective_type: newObjective.objective_type,
-        due_date: newObjective.due_date || null,
-      });
+      const { error } = await supabase
+        .from("user_objectives")
+        .insert({
+          user_id: user.id,
+          title: newObjective.title,
+          description: newObjective.description,
+          target_value: newObjective.target_value,
+          objective_type: newObjective.objective_type,
+          due_date: newObjective.due_date || null,
+        })
+        .schema("mapper");
 
       if (error) throw error;
 
@@ -147,7 +159,8 @@ const Achievements = () => {
       const { error } = await supabase
         .from("user_objectives")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .schema("mapper");
 
       if (error) throw error;
       toast.success("Objetivo eliminado");
@@ -159,8 +172,8 @@ const Achievements = () => {
   };
 
   const earnedCount = achievements.filter((a) => a.earned).length;
-  const progressPercentage = achievements.length > 0 
-    ? Math.round((earnedCount / achievements.length) * 100) 
+  const progressPercentage = achievements.length > 0
+    ? Math.round((earnedCount / achievements.length) * 100)
     : 0;
 
   const getLevel = (points: number) => {
@@ -172,10 +185,10 @@ const Achievements = () => {
   };
 
   const level = getLevel(totalPoints);
-  const nextLevel = totalPoints >= 500 ? null : 
+  const nextLevel = totalPoints >= 500 ? null :
     totalPoints >= 300 ? 500 :
-    totalPoints >= 150 ? 300 :
-    totalPoints >= 50 ? 150 : 50;
+      totalPoints >= 150 ? 300 :
+        totalPoints >= 50 ? 150 : 50;
 
   if (loading) {
     return (
@@ -270,8 +283,8 @@ const Achievements = () => {
         <TabsContent value="achievements" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             {achievements.map((achievement) => (
-              <AchievementCard 
-                key={achievement.id} 
+              <AchievementCard
+                key={achievement.id}
                 achievement={achievement}
                 size="md"
               />

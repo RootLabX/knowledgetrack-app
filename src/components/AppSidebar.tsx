@@ -5,15 +5,11 @@ import {
   Brain,
   GraduationCap,
   Home,
-  BookOpen,
-  Brain,
-  GraduationCap,
-  Home,
   LayoutDashboard,
   Settings,
+  Target,
   Users,
 } from "lucide-react";
-import { NavLink } from "@/components/NavLink";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -33,6 +29,7 @@ const mainNavItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Evaluaciones", url: "/assessment", icon: Brain },
   { title: "Cursos", url: "/courses", icon: BookOpen },
+  { title: "Planificación", url: "/planning", icon: Target },
   { title: "Ruta de Aprendizaje", url: "/learning-path", icon: GraduationCap },
   { title: "Logros", url: "/achievements", icon: Award },
 ];

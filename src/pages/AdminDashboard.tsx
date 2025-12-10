@@ -125,40 +125,54 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      setLoading(true);
+
       // Fetch profiles
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name, department, position");
+        .select("*");
+
+      if (profilesError) throw profilesError;
 
       // Fetch courses
-      const { data: courses } = await supabase
+      const { data: courses, error: coursesError } = await supabase
         .from("courses")
-        .select("id, title, category")
-        .eq("is_active", true);
+        .select("*")
+        .schema("mapper");
 
-      // Fetch user courses with progress
-      const { data: userCourses } = await supabase
+      if (coursesError) throw coursesError;
+
+      // Fetch user courses
+      const { data: userCourses, error: userCoursesError } = await supabase
         .from("user_courses")
-        .select("user_id, course_id, status, progress");
+        .select("*")
+        .schema("mapper");
+
+      if (userCoursesError) throw userCoursesError;
 
       // Fetch assessments
-      const { data: assessments } = await supabase
+      const { data: assessments, error: assessmentsError } = await supabase
         .from("assessments")
-        .select("user_id, status, correct_answers, total_questions, results");
+        .select("*")
+        .schema("mapper");
 
-      // Fetch assessment responses for section analysis
-      const { data: responses } = await supabase
-        .from("assessment_responses")
-        .select("assessment_id, section, is_correct");
+      if (assessmentsError) throw assessmentsError;
 
-      // Calculate section stats across all users
+      // Process assessments for section stats
       const sectionMap: { [key: string]: { total: number; correct: number } } = {};
-      (responses || []).forEach((r) => {
-        if (!sectionMap[r.section]) {
-          sectionMap[r.section] = { total: 0, correct: 0 };
+
+      (assessments || []).forEach((assessment) => {
+        if (assessment.status === 'completed' && assessment.results) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const results = assessment.results as { [key: string]: { correct: number; total: number } };
+          Object.entries(results).forEach(([section, data]) => {
+            if (!sectionMap[section]) {
+              sectionMap[section] = { total: 0, correct: 0 };
+            }
+            sectionMap[section].total += data.total;
+            sectionMap[section].correct += data.correct;
+          });
         }
-        sectionMap[r.section].total += 1;
-        if (r.is_correct) sectionMap[r.section].correct += 1;
       });
 
       const sectionStats: AssessmentSection[] = Object.entries(sectionMap)
@@ -180,6 +194,7 @@ const AdminDashboard = () => {
         // Parse results to find knowledge gaps
         let knowledgeGaps: string[] = [];
         if (memberAssessment?.results) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const results = memberAssessment.results as { [key: string]: { correct: number; total: number } };
           knowledgeGaps = Object.entries(results)
             .filter(([, data]) => data.total > 0 && (data.correct / data.total) < 0.6)
@@ -216,9 +231,9 @@ const AdminDashboard = () => {
           avgProgress:
             courseAssignments.length > 0
               ? Math.round(
-                  courseAssignments.reduce((acc, c) => acc + (c.progress || 0), 0) /
-                    courseAssignments.length
-                )
+                courseAssignments.reduce((acc, c) => acc + (c.progress || 0), 0) /
+                courseAssignments.length
+              )
               : 0,
         };
       });
@@ -228,11 +243,11 @@ const AdminDashboard = () => {
       const avgScore =
         completedAssessments.length > 0
           ? Math.round(
-              completedAssessments.reduce(
-                (acc, a) => acc + ((a.correct_answers || 0) / (a.total_questions || 1)) * 100,
-                0
-              ) / completedAssessments.length
-            )
+            completedAssessments.reduce(
+              (acc, a) => acc + ((a.correct_answers || 0) / (a.total_questions || 1)) * 100,
+              0
+            ) / completedAssessments.length
+          )
           : 0;
 
       setStats({
@@ -282,7 +297,7 @@ const AdminDashboard = () => {
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
     const baseAssessments = Math.max(1, stats.assessmentsCompleted);
     const baseCourses = Math.max(1, stats.completedAssignments);
-    
+
     return months.map((month, index) => {
       const factor = (index + 1) / 6;
       return {
@@ -392,15 +407,15 @@ const AdminDashboard = () => {
 
       {/* Charts Section */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <ProgressTrendsChart 
-          data={generateTrendData(stats.teamMembers)} 
+        <ProgressTrendsChart
+          data={generateTrendData(stats.teamMembers)}
         />
-        <ScoreDistributionChart 
-          data={generateScoreDistribution(stats.teamMembers)} 
+        <ScoreDistributionChart
+          data={generateScoreDistribution(stats.teamMembers)}
         />
       </div>
 
-      <SectionPerformanceChart 
+      <SectionPerformanceChart
         data={stats.sectionStats.map(s => ({
           section: SECTION_NAMES[s.section] || s.section,
           avgScore: s.avgScore

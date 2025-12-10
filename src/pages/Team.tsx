@@ -70,7 +70,7 @@ const Team = () => {
 
   const fetchTeamData = async () => {
     try {
-      // Fetch profiles with roles
+      // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, user_id, full_name, department, position");
@@ -84,18 +84,18 @@ const Team = () => {
 
       if (rolesError) throw rolesError;
 
-      // Fetch user courses for stats
-      const { data: userCourses, error: coursesError } = await supabase
+      // Fetch user courses
+      const { data: userCourses, error: userCoursesError } = await supabase
+        .schema("mapper")
         .from("user_courses")
         .select("user_id, status");
 
-      if (coursesError) throw coursesError;
+      if (userCoursesError) throw userCoursesError;
 
-      // Combine data
-      const members: TeamMember[] = (profiles || []).map((profile) => {
+      const members: TeamMember[] = profiles.map((profile) => {
         const userRole = roles?.find((r) => r.user_id === profile.user_id);
         const userCoursesData = userCourses?.filter((c) => c.user_id === profile.user_id) || [];
-        
+
         return {
           id: profile.id,
           user_id: profile.user_id,
@@ -112,6 +112,7 @@ const Team = () => {
 
       // Fetch courses for assignment
       const { data: coursesData } = await supabase
+        .schema("mapper")
         .from("courses")
         .select("id, title, category")
         .eq("is_active", true);
@@ -129,10 +130,16 @@ const Team = () => {
     if (!selectedMember || !selectedCourse) return;
 
     try {
-      const { error } = await supabase.from("user_courses").insert({
-        user_id: selectedMember.user_id,
-        course_id: selectedCourse,
-      });
+      const { error } = await supabase
+        .schema("mapper")
+        .from("user_courses")
+        .insert({
+          user_id: selectedMember.user_id,
+          course_id: selectedCourse,
+          status: 'assigned',
+          progress: 0,
+          assigned_at: new Date().toISOString()
+        });
 
       if (error) throw error;
 
@@ -144,6 +151,7 @@ const Team = () => {
       if (error.code === "23505") {
         toast.error("Este curso ya está asignado a este usuario");
       } else {
+        console.error("Error assigning course:", error);
         toast.error("Error al asignar el curso");
       }
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ const Auth = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const { error } = isLogin 
+    const { error } = isLogin
       ? await signIn(email, password)
       : await signUp(email, password);
 
@@ -71,8 +72,8 @@ const Auth = () => {
             {isLogin ? "Iniciar sesión" : "Crear cuenta"}
           </CardTitle>
           <CardDescription>
-            {isLogin 
-              ? "Ingresa tus credenciales para continuar" 
+            {isLogin
+              ? "Ingresa tus credenciales para continuar"
               : "Completa los datos para registrarte"}
           </CardDescription>
         </CardHeader>
@@ -108,6 +109,45 @@ const Auth = () => {
           </form>
 
           <div className="mt-4 text-center text-sm">
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  O continuar con
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full mb-4"
+              onClick={async () => {
+                try {
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'azure',
+                    options: {
+                      scopes: 'email',
+                      redirectTo: `${window.location.origin}/`,
+                    },
+                  });
+                  if (error) throw error;
+                } catch (error: any) {
+                  toast.error(error.message);
+                }
+              }}
+            >
+              <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23">
+                <path fill="#f35325" d="M1 1h10v10H1z" />
+                <path fill="#81bc06" d="M12 1h10v10H12z" />
+                <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                <path fill="#ffba08" d="M12 12h10v10H12z" />
+              </svg>
+              Microsoft
+            </Button>
+
             <span className="text-muted-foreground">
               {isLogin ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
             </span>

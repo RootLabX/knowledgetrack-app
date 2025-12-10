@@ -1,7 +1,10 @@
+-- Create Schema
+create schema if not exists mapper;
+
 -- Create roles enum
 CREATE TYPE public.app_role AS ENUM ('admin', 'user');
 
--- Create profiles table
+-- Create profiles table (Keep in public)
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
@@ -13,7 +16,7 @@ CREATE TABLE public.profiles (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Create user_roles table
+-- Create user_roles table (Keep in public)
 CREATE TABLE public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
@@ -21,8 +24,8 @@ CREATE TABLE public.user_roles (
   UNIQUE (user_id, role)
 );
 
--- Create courses table
-CREATE TABLE public.courses (
+-- Create courses table (Move to mapper)
+CREATE TABLE mapper.courses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT,
@@ -35,11 +38,11 @@ CREATE TABLE public.courses (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Create user_courses table (assignments)
-CREATE TABLE public.user_courses (
+-- Create user_courses table (assignments) (Move to mapper)
+CREATE TABLE mapper.user_courses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE NOT NULL,
+  course_id UUID REFERENCES mapper.courses(id) ON DELETE CASCADE NOT NULL,
   progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   status TEXT DEFAULT 'assigned' CHECK (status IN ('assigned', 'in_progress', 'completed')),
   assigned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -51,8 +54,8 @@ CREATE TABLE public.user_courses (
 -- Enable RLS on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mapper.courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mapper.user_courses ENABLE ROW LEVEL SECURITY;
 
 -- Security definer function to check roles
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
@@ -94,29 +97,29 @@ CREATE POLICY "Admins can delete roles" ON public.user_roles
   FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 
 -- Courses policies (everyone can view, admins can manage)
-CREATE POLICY "Everyone can view active courses" ON public.courses
+CREATE POLICY "Everyone can view active courses" ON mapper.courses
   FOR SELECT TO authenticated USING (is_active = true OR public.has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Admins can insert courses" ON public.courses
+CREATE POLICY "Admins can insert courses" ON mapper.courses
   FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Admins can update courses" ON public.courses
+CREATE POLICY "Admins can update courses" ON mapper.courses
   FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Admins can delete courses" ON public.courses
+CREATE POLICY "Admins can delete courses" ON mapper.courses
   FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 
 -- User courses policies
-CREATE POLICY "Users can view own assignments" ON public.user_courses
+CREATE POLICY "Users can view own assignments" ON mapper.user_courses
   FOR SELECT TO authenticated USING (auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Admins can assign courses" ON public.user_courses
+CREATE POLICY "Admins can assign courses" ON mapper.user_courses
   FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Users can update own progress" ON public.user_courses
+CREATE POLICY "Users can update own progress" ON mapper.user_courses
   FOR UPDATE TO authenticated USING (auth.uid() = user_id OR public.has_role(auth.uid(), 'admin'));
 
-CREATE POLICY "Admins can delete assignments" ON public.user_courses
+CREATE POLICY "Admins can delete assignments" ON mapper.user_courses
   FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 
 -- Function to handle new user signup
@@ -160,5 +163,5 @@ CREATE TRIGGER update_profiles_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_courses_updated_at
-  BEFORE UPDATE ON public.courses
+  BEFORE UPDATE ON mapper.courses
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

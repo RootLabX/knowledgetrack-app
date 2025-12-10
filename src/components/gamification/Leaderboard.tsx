@@ -22,63 +22,64 @@ export const Leaderboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchLeaderboard();
-  }, []);
+    const fetchLeaderboardData = async () => {
+      try {
+        // Fetch profiles
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, department");
 
-  const fetchLeaderboard = async () => {
-    try {
-      // Get all user achievements with points
-      const { data: userAchievements } = await supabase
-        .from("user_achievements")
-        .select(`
-          user_id,
-          achievement_id,
-          achievements (points)
-        `);
+        if (profilesError) throw profilesError;
 
-      // Get all profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, full_name, department");
+        // Fetch user achievements with points
+        const { data: userAchievements, error: achievementsError } = await supabase
+          .schema("mapper")
+          .from("user_achievements")
+          .select("user_id, achievement:achievements(points)");
 
-      // Calculate points per user
-      const pointsMap = new Map<string, { points: number; count: number }>();
-      
-      (userAchievements || []).forEach((ua: any) => {
-        const points = ua.achievements?.points || 0;
-        const current = pointsMap.get(ua.user_id) || { points: 0, count: 0 };
-        pointsMap.set(ua.user_id, {
-          points: current.points + points,
-          count: current.count + 1,
+        if (achievementsError) throw achievementsError;
+
+        // Calculate points per user
+        const pointsMap = new Map<string, { points: number; count: number }>();
+
+        (userAchievements || []).forEach((ua: any) => {
+          const points = ua.achievement?.points || 0;
+          const current = pointsMap.get(ua.user_id) || { points: 0, count: 0 };
+          pointsMap.set(ua.user_id, {
+            points: current.points + points,
+            count: current.count + 1,
+          });
         });
-      });
 
-      // Build leaderboard entries
-      const leaderboard: LeaderboardEntry[] = (profiles || []).map((profile) => {
-        const stats = pointsMap.get(profile.user_id) || { points: 0, count: 0 };
-        return {
-          user_id: profile.user_id,
-          full_name: profile.full_name,
-          department: profile.department,
-          total_points: stats.points,
-          achievements_count: stats.count,
-          rank: 0,
-        };
-      });
+        // Build leaderboard entries
+        const leaderboard: LeaderboardEntry[] = (profiles || []).map((profile) => {
+          const stats = pointsMap.get(profile.user_id) || { points: 0, count: 0 };
+          return {
+            user_id: profile.user_id,
+            full_name: profile.full_name,
+            department: profile.department,
+            total_points: stats.points,
+            achievements_count: stats.count,
+            rank: 0,
+          };
+        });
 
-      // Sort by points and assign ranks
-      leaderboard.sort((a, b) => b.total_points - a.total_points);
-      leaderboard.forEach((entry, index) => {
-        entry.rank = index + 1;
-      });
+        // Sort by points and assign ranks
+        leaderboard.sort((a, b) => b.total_points - a.total_points);
+        leaderboard.forEach((entry, index) => {
+          entry.rank = index + 1;
+        });
 
-      setEntries(leaderboard);
-    } catch (error) {
-      console.error("Error fetching leaderboard:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setEntries(leaderboard);
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboardData();
+  }, [user]);
 
   const getInitials = (name: string | null) => {
     if (!name) return "U";
