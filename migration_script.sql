@@ -119,6 +119,22 @@ CREATE TABLE public.user_objectives (
 );
 
 -- ============================================================
+-- 2.1 FOREIGN KEYS (después de crear todas las tablas)
+-- ============================================================
+
+ALTER TABLE public.user_achievements 
+  ADD CONSTRAINT user_achievements_achievement_id_fkey 
+  FOREIGN KEY (achievement_id) REFERENCES public.achievements(id);
+
+ALTER TABLE public.user_courses 
+  ADD CONSTRAINT user_courses_course_id_fkey 
+  FOREIGN KEY (course_id) REFERENCES public.courses(id);
+
+ALTER TABLE public.assessment_responses 
+  ADD CONSTRAINT assessment_responses_assessment_id_fkey 
+  FOREIGN KEY (assessment_id) REFERENCES public.assessments(id);
+
+-- ============================================================
 -- 3. FUNCTIONS
 -- ============================================================
 
