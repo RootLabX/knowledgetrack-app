@@ -154,10 +154,25 @@ const Assessment = () => {
   const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
 
+  const [canTakeAssessment, setCanTakeAssessment] = useState(false);
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
+
   useEffect(() => {
-    const fetchAssessment = async () => {
+    const fetchData = async () => {
       if (!user) return;
       try {
+        // Fetch permissions
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("is_assessment_enabled")
+          .eq("user_id", user.id)
+          .single();
+
+        if (!profileError && profileData) {
+          setCanTakeAssessment(profileData.is_assessment_enabled || false);
+        }
+
+        // Fetch existing assessment
         const { data, error } = await supabase
           .schema("mapper")
           .from("assessments")
@@ -171,11 +186,13 @@ const Assessment = () => {
         if (error) throw error;
         if (data) setExistingAssessment(data);
       } catch (error) {
-        console.error("Error fetching assessment:", error);
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoadingPermissions(false);
       }
     };
 
-    fetchAssessment();
+    fetchData();
   }, [user]);
 
   const startNewAssessment = () => {
@@ -355,9 +372,20 @@ const Assessment = () => {
                 </div>
               ))}
             </div>
-            <Button onClick={startNewAssessment} className="mt-6 w-full">
-              {existingAssessment ? "Realizar Nueva Evaluación" : "Comenzar Evaluación"}
+            <Button
+              onClick={startNewAssessment}
+              className="mt-6 w-full"
+              disabled={!canTakeAssessment || loadingPermissions}
+            >
+              {loadingPermissions ? "Cargando..." : (
+                existingAssessment ? "Realizar Nueva Evaluación" : "Comenzar Evaluación"
+              )}
             </Button>
+            {!canTakeAssessment && !loadingPermissions && (
+              <p className="mt-3 text-center text-sm text-muted-foreground bg-secondary/50 p-2 rounded-md">
+                Esta evaluación solo está habilitada por el administrador.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
