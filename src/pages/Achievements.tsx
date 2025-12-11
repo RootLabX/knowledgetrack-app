@@ -1,20 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Award, Plus, Target, Trophy, Zap } from "lucide-react";
+import { Award, Trophy, Zap, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { AchievementCard } from "@/components/gamification/AchievementCard";
-import { ObjectiveCard } from "@/components/gamification/ObjectiveCard";
+
 import { Leaderboard } from "@/components/gamification/Leaderboard";
+import { CreateAchievementDialog } from "@/components/gamification/CreateAchievementDialog";
+import { EmployeeList } from "@/components/gamification/EmployeeList";
 
 interface Achievement {
   id: string;
@@ -29,31 +27,14 @@ interface Achievement {
   earned_at?: string;
 }
 
-interface UserObjective {
-  id: string;
-  title: string;
-  description: string | null;
-  target_value: number;
-  current_value: number;
-  objective_type: string;
-  status: string;
-  due_date: string | null;
-}
+
 
 const Achievements = () => {
   const { user } = useAuth();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [objectives, setObjectives] = useState<UserObjective[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newObjective, setNewObjective] = useState({
-    title: "",
-    description: "",
-    target_value: 1,
-    objective_type: "courses",
-    due_date: "",
-  });
+
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -61,18 +42,22 @@ const Achievements = () => {
     try {
       // Fetch all achievements
       const { data: allAchievements, error: achievementsError } = await supabase
+        // @ts-ignore
+        .schema("mapper")
         .from("achievements")
-        .select("*")
-        .schema("mapper");
+        .select("*");
+
 
       if (achievementsError) throw achievementsError;
 
       // Fetch user earned achievements
       const { data: userAchievements, error: userAchievementsError } = await supabase
+        // @ts-ignore
+        .schema("mapper")
         .from("user_achievements")
         .select("achievement_id, earned_at")
-        .eq("user_id", user.id)
-        .schema("mapper");
+        .eq("user_id", user.id);
+
 
       if (userAchievementsError) throw userAchievementsError;
 
@@ -93,16 +78,7 @@ const Achievements = () => {
         .reduce((sum, a) => sum + a.points, 0);
       setTotalPoints(points);
 
-      // Fetch user objectives
-      const { data: userObjectives, error: objectivesError } = await supabase
-        .from("user_objectives")
-        .select("*")
-        .eq("user_id", user.id)
-        .schema("mapper");
 
-      if (objectivesError) throw objectivesError;
-
-      setObjectives(userObjectives || []);
 
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -116,60 +92,7 @@ const Achievements = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleCreateObjective = async () => {
-    if (!user) return;
-    if (!newObjective.title) {
-      toast.error("El título es obligatorio");
-      return;
-    }
 
-    try {
-      const { error } = await supabase
-        .from("user_objectives")
-        .insert({
-          user_id: user.id,
-          title: newObjective.title,
-          description: newObjective.description,
-          target_value: newObjective.target_value,
-          objective_type: newObjective.objective_type,
-          due_date: newObjective.due_date || null,
-        })
-        .schema("mapper");
-
-      if (error) throw error;
-
-      toast.success("Objetivo creado exitosamente");
-      setDialogOpen(false);
-      setNewObjective({
-        title: "",
-        description: "",
-        target_value: 1,
-        objective_type: "courses",
-        due_date: "",
-      });
-      fetchData();
-    } catch (error) {
-      console.error("Error creating objective:", error);
-      toast.error("Error al crear objetivo");
-    }
-  };
-
-  const handleDeleteObjective = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("user_objectives")
-        .delete()
-        .eq("id", id)
-        .schema("mapper");
-
-      if (error) throw error;
-      toast.success("Objetivo eliminado");
-      fetchData();
-    } catch (error) {
-      console.error("Error deleting objective:", error);
-      toast.error("Error al eliminar objetivo");
-    }
-  };
 
   const earnedCount = achievements.filter((a) => a.earned).length;
   const progressPercentage = achievements.length > 0
@@ -201,9 +124,9 @@ const Achievements = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Logros y Objetivos</h1>
+        <h1 className="text-2xl font-bold text-foreground">Logros</h1>
         <p className="text-muted-foreground">
-          Gamificación y metas personales de aprendizaje
+          Gamificación y medallas personales de aprendizaje
         </p>
       </div>
 
@@ -270,10 +193,11 @@ const Achievements = () => {
             <Award className="h-4 w-4" />
             Logros
           </TabsTrigger>
-          <TabsTrigger value="objectives" className="gap-2">
-            <Target className="h-4 w-4" />
-            Objetivos
+          <TabsTrigger value="employees" className="gap-2">
+            <Users className="h-4 w-4" />
+            Colaboradores
           </TabsTrigger>
+
         </TabsList>
 
         <TabsContent value="leaderboard">
@@ -281,6 +205,9 @@ const Achievements = () => {
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-4">
+          <div className="flex justify-end">
+            <CreateAchievementDialog onAchievementCreated={fetchData} />
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             {achievements.map((achievement) => (
               <AchievementCard
@@ -292,124 +219,11 @@ const Achievements = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="objectives" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Mis Objetivos</h3>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Objetivo
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Crear Nuevo Objetivo</DialogTitle>
-                  <DialogDescription>
-                    Define una meta personal para tu aprendizaje
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Título *</Label>
-                    <Input
-                      id="title"
-                      placeholder="Ej: Completar 3 cursos de arquitectura"
-                      value={newObjective.title}
-                      onChange={(e) =>
-                        setNewObjective({ ...newObjective, title: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Descripción</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe tu objetivo..."
-                      value={newObjective.description}
-                      onChange={(e) =>
-                        setNewObjective({ ...newObjective, description: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Tipo</Label>
-                      <Select
-                        value={newObjective.objective_type}
-                        onValueChange={(value) =>
-                          setNewObjective({ ...newObjective, objective_type: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="courses">Cursos</SelectItem>
-                          <SelectItem value="assessment_score">Puntaje de Evaluación</SelectItem>
-                          <SelectItem value="daily_streak">Racha Diaria</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="target">Meta *</Label>
-                      <Input
-                        id="target"
-                        type="number"
-                        min={1}
-                        value={newObjective.target_value}
-                        onChange={(e) =>
-                          setNewObjective({
-                            ...newObjective,
-                            target_value: parseInt(e.target.value) || 1,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="due_date">Fecha Límite (opcional)</Label>
-                    <Input
-                      id="due_date"
-                      type="date"
-                      value={newObjective.due_date}
-                      onChange={(e) =>
-                        setNewObjective({ ...newObjective, due_date: e.target.value })
-                      }
-                    />
-                  </div>
-                  <Button onClick={handleCreateObjective} className="w-full">
-                    Crear Objetivo
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {objectives.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Target className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">
-                  No tienes objetivos definidos
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Crea tu primer objetivo para empezar a trackear tu progreso
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {objectives.map((objective) => (
-                <ObjectiveCard
-                  key={objective.id}
-                  objective={objective}
-                  onDelete={handleDeleteObjective}
-                />
-              ))}
-            </div>
-          )}
+        <TabsContent value="employees">
+          <EmployeeList />
         </TabsContent>
+
+
       </Tabs>
     </div>
   );
