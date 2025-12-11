@@ -13,9 +13,39 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [userName, setUserName] = useState<string>("");
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', user.id)
+          .single();
+
+        if (data?.full_name) {
+          setUserName(data.full_name);
+        } else if (user.user_metadata?.full_name) {
+          setUserName(user.user_metadata.full_name);
+        } else if (user.email) {
+          setUserName(user.email.split("@")[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   const stats = [
     { label: "Evaluaciones Completadas", value: "0", icon: Brain, color: "text-primary" },
@@ -53,7 +83,7 @@ const Index = () => {
       {/* Welcome Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          Bienvenido{user?.email ? `, ${user.email.split("@")[0]}` : ""}
+          Bienvenido, {userName}
         </h1>
         <p className="text-muted-foreground">
           Aquí tienes un resumen de tu progreso y actividades recientes.

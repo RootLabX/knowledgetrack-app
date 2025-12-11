@@ -1,50 +1,21 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, signIn, signUp } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && user) {
       navigate("/", { replace: true });
     }
   }, [user, loading, navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const { error } = isLogin
-      ? await signIn(email, password)
-      : await signUp(email, password);
-
-    if (error) {
-      if (error.message.includes("Invalid login credentials")) {
-        toast.error("Credenciales inválidas");
-      } else if (error.message.includes("User already registered")) {
-        toast.error("Este correo ya está registrado");
-      } else {
-        toast.error(error.message);
-      }
-    } else if (!isLogin) {
-      toast.success("Cuenta creada exitosamente");
-    }
-
-    setIsSubmitting(false);
-  };
 
   if (loading) {
     return (
@@ -55,110 +26,57 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
-      <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-          <GraduationCap className="h-7 w-7 text-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">DevSkills</h1>
-          <p className="text-sm text-muted-foreground">PandaTech</p>
-        </div>
-      </div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F1F5F9] p-4">
+      <Card className="w-full max-w-md border-none shadow-lg">
+        <CardContent className="flex flex-col items-center pt-10 pb-10 px-8 text-center">
 
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl">
-            {isLogin ? "Iniciar sesión" : "Crear cuenta"}
-          </CardTitle>
-          <CardDescription>
-            {isLogin
-              ? "Ingresa tus credenciales para continuar"
-              : "Completa los datos para registrarte"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Correo electrónico</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? "Iniciar sesión" : "Crear cuenta"}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center text-sm">
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  O continuar con
-                </span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full mb-4"
-              onClick={async () => {
-                try {
-                  const { error } = await supabase.auth.signInWithOAuth({
-                    provider: 'azure',
-                    options: {
-                      scopes: 'email',
-                      redirectTo: `${window.location.origin}/`,
-                    },
-                  });
-                  if (error) throw error;
-                } catch (error: any) {
-                  toast.error(error.message);
-                }
-              }}
-            >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23">
-                <path fill="#f35325" d="M1 1h10v10H1z" />
-                <path fill="#81bc06" d="M12 1h10v10H12z" />
-                <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                <path fill="#ffba08" d="M12 12h10v10H12z" />
-              </svg>
-              Microsoft
-            </Button>
-
-            <span className="text-muted-foreground">
-              {isLogin ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline font-medium"
-            >
-              {isLogin ? "Regístrate" : "Inicia sesión"}
-            </button>
+          {/* Logo */}
+          <div className="mb-8 w-full max-w-[280px]">
+            <img
+              src="/images/pandatech-logo-BxiF7NRv.png"
+              alt="PandaTech Logo"
+              className="h-auto w-full object-contain"
+            />
           </div>
+
+          {/* Titles */}
+          <div className="space-y-2 mb-8">
+            <h1 className="text-[#0ea5e9] text-2xl font-bold tracking-tight">
+              PANDATECH SkillsPath
+            </h1>
+            <p className="text-muted-foreground text-sm font-medium">
+              Sistema de Gestión Capacitación
+            </p>
+          </div>
+
+          {/* Login Button */}
+          <Button
+            type="button"
+            className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#0EA5E9] hover:opacity-90 text-white shadow-md border-0 h-11 text-base font-medium rounded-full mb-6"
+            onClick={async () => {
+              try {
+                const { error } = await supabase.auth.signInWithOAuth({
+                  provider: 'azure',
+                  options: {
+                    scopes: 'email',
+                    redirectTo: `${window.location.origin}/`,
+                  },
+                });
+                if (error) throw error;
+              } catch (error: any) {
+                toast.error(error.message);
+              }
+            }}
+          >
+            <LayoutGrid className="mr-2 h-5 w-5" />
+            Iniciar sesión con Microsoft
+          </Button>
+
+          {/* Footer Text */}
+          <p className="text-xs text-muted-foreground text-center px-4 leading-relaxed">
+            El registro de nuevos usuarios solo puede ser realizado por un administrador.
+          </p>
+
         </CardContent>
       </Card>
     </div>

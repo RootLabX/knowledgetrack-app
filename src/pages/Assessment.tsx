@@ -469,7 +469,8 @@ const Assessment = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <RadioGroup
-            value={answers[currentQuestion]?.toString()}
+            key={currentQuestion}
+            value={answers[currentQuestion]?.toString() ?? ""}
             onValueChange={handleAnswer}
           >
             <div className="space-y-3">
@@ -478,8 +479,14 @@ const Assessment = () => {
                   key={index}
                   className="flex items-center space-x-3 rounded-lg border p-4 transition-colors hover:bg-muted/50"
                 >
-                  <RadioGroupItem value={index.toString()} id={`option-${index}`} />
-                  <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
+                  <RadioGroupItem
+                    value={index.toString()}
+                    id={`q${question.id}-option-${index}`}
+                  />
+                  <Label
+                    htmlFor={`q${question.id}-option-${index}`}
+                    className="flex-1 cursor-pointer"
+                  >
                     {option}
                   </Label>
                 </div>

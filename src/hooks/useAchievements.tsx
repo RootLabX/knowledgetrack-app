@@ -38,9 +38,9 @@ export const useAchievements = () => {
     if (!user) return;
 
     const { data: achievementsData, error: achievementsError } = await supabase
+      .schema("mapper")
       .from("achievements")
-      .select("*")
-      .schema("mapper");
+      .select("*");
 
     if (achievementsError) {
       console.error("Error fetching achievements:", achievementsError);
@@ -50,17 +50,22 @@ export const useAchievements = () => {
     setAchievements(achievementsData || []);
 
     const { data: userAchievementsData, error: userAchievementsError } = await supabase
+      .schema("mapper")
       .from("user_achievements")
-      .select("*, achievement:achievements(*)")
-      .eq("user_id", user.id)
-      .schema("mapper");
+      .select("*, achievements!fk_user_achievements_achievements(*)")
+      .eq("user_id", user.id);
 
     if (userAchievementsError) {
       console.error("Error fetching user achievements:", userAchievementsError);
       return;
     }
 
-    setUserAchievements(userAchievementsData || []);
+    const mappedUserAchievements: UserAchievement[] = (userAchievementsData || []).map((item: any) => ({
+      ...item,
+      achievement: item.achievements
+    }));
+
+    setUserAchievements(mappedUserAchievements);
   }, [user]);
 
   useEffect(() => {
@@ -151,12 +156,12 @@ export const useAchievements = () => {
 
       if (unlocked) {
         const { error } = await supabase
+          .schema("mapper")
           .from("user_achievements")
           .insert({
             user_id: user.id,
             achievement_id: achievement.id
-          })
-          .schema("mapper");
+          });
 
         if (!error) {
           newUnlocked.push(achievement);
