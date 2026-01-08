@@ -1,0 +1,4 @@
+-- Add scheduling dates to courses
+ALTER TABLE mapper.courses 
+ADD COLUMN IF NOT EXISTS start_date TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS end_date TIMESTAMP WITH TIME ZONE;
