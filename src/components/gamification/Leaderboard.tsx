@@ -31,6 +31,7 @@ export const Leaderboard = () => {
   const { user } = useAuth();
   const [topEntries, setTopEntries] = useState<LeaderboardEntry[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
+  const [rewards, setRewards] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +43,21 @@ export const Leaderboard = () => {
           .select("id, full_name, department");
 
         if (profilesError) throw profilesError;
+
+        // Fetch rewards
+        const { data: rewardsData } = await supabase
+          // @ts-ignore
+          .schema("mapper")
+          .from("quarterly_rewards")
+          .select("rank, reward");
+
+        const rewardsMap: Record<number, string> = {};
+        if (rewardsData) {
+          rewardsData.forEach((r: any) => {
+            rewardsMap[r.rank] = r.reward;
+          });
+          setRewards(rewardsMap);
+        }
 
         // Fetch user achievements with points and timestamps
         const { data: userAchievements, error: achievementsError } = await supabase
@@ -144,6 +160,31 @@ export const Leaderboard = () => {
     }
   };
 
+
+
+  const getDaysRemainingInQuarter = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // Quarter ends: March (2), June (5), September (8), December (11)
+    let quarterEndMonth = 2;
+    if (currentMonth > 2) quarterEndMonth = 5;
+    if (currentMonth > 5) quarterEndMonth = 8;
+    if (currentMonth > 8) quarterEndMonth = 11;
+
+    // Last day of the quarter month
+    const quarterEndDate = new Date(currentYear, quarterEndMonth + 1, 0);
+
+    // Calculate difference in days using simple math to avoid extra imports if not needed, 
+    // but since we have date-fns already imported in the file (implied by usage of formatDistanceToNow), 
+    // let's stick to standard JS for simplicity and zero dep/import changes if possible, 
+    // or better yet, just do the math.
+    const diffTime = Math.abs(quarterEndDate.getTime() - now.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
   if (loading) {
     return (
       <Card>
@@ -162,6 +203,9 @@ export const Leaderboard = () => {
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             Top 5 del Trimestre
+            <Badge variant="outline" className="ml-2 text-xs font-normal">
+              Termina en {getDaysRemainingInQuarter()} días
+            </Badge>
           </CardTitle>
           <CardDescription>Los mejores puntuajes de este trimestre</CardDescription>
         </CardHeader>
@@ -185,7 +229,14 @@ export const Leaderboard = () => {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{entry.full_name}</p>
-                    <p className="text-xs text-muted-foreground">{entry.achievements_count} logros</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">{entry.achievements_count} logros</p>
+                      {rewards[entry.rank] && (
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
+                          {rewards[entry.rank]}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <span className="font-bold text-primary">{entry.total_points}</span>

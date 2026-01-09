@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,24 +7,59 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trophy, Star, Zap, Target, Book, Award, Crown } from "lucide-react";
+import { Plus, Trophy, Star, Zap, Target, Book, Award, Crown, Pencil } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CreateAchievementDialogProps {
     onAchievementCreated: () => void;
+    achievementToEdit?: any;
 }
 
-export function CreateAchievementDialog({ onAchievementCreated }: CreateAchievementDialogProps) {
+export function CreateAchievementDialog({ onAchievementCreated, achievementToEdit }: CreateAchievementDialogProps) {
+    const { user } = useAuth();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        const checkAdmin = async () => {
+            if (!user) return;
+            const { data } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", user.id)
+                .eq("role", "admin")
+                .maybeSingle();
+
+            setIsAdmin(!!data);
+        };
+        checkAdmin();
+    }, [user]);
+
+
     const [formData, setFormData] = useState({
-        name: "",
-        description: "",
-        points: 10,
-        category: "milestone",
-        icon: "award",
-        criteria_type: "manual",
-        criteria_value: 1
+        name: achievementToEdit?.name || "",
+        description: achievementToEdit?.description || "",
+        points: achievementToEdit?.points || 10,
+        category: achievementToEdit?.category || "milestone",
+        icon: achievementToEdit?.icon || "award",
+        criteria_type: achievementToEdit?.criteria_type || "manual",
+        criteria_value: achievementToEdit?.criteria_value || 1
     });
+
+    useEffect(() => {
+        if (open && achievementToEdit) {
+            setFormData({
+                name: achievementToEdit.name,
+                description: achievementToEdit.description,
+                points: achievementToEdit.points,
+                category: achievementToEdit.category,
+                icon: achievementToEdit.icon,
+                criteria_type: achievementToEdit.criteria_type,
+                criteria_value: achievementToEdit.criteria_value
+            });
+        }
+    }, [achievementToEdit, open]);
 
     const handleSubmit = async () => {
         if (!formData.name || !formData.description) {
@@ -34,31 +69,54 @@ export function CreateAchievementDialog({ onAchievementCreated }: CreateAchievem
 
         setLoading(true);
         try {
-            const { error } = await supabase
-                // @ts-ignore
-                .schema("mapper")
-                .from("achievements")
-                .insert({
-                    ...formData,
-                    points: Number(formData.points),
-                    criteria_value: Number(formData.criteria_value)
-                });
+            console.log("Submitting form data:", formData);
+            let error;
+            if (achievementToEdit) {
+                console.log("Updating achievement:", achievementToEdit.id);
+                const { data, error: updateError } = await supabase
+                    // @ts-ignore
+                    .schema("mapper")
+                    .from("achievements")
+                    .update({
+                        ...formData,
+                        points: Number(formData.points),
+                        criteria_value: Number(formData.criteria_value)
+                    })
+                    .eq("id", achievementToEdit.id)
+                    .select();
+
+                console.log("Update result:", { data, updateError });
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    // @ts-ignore
+                    .schema("mapper")
+                    .from("achievements")
+                    .insert({
+                        ...formData,
+                        points: Number(formData.points),
+                        criteria_value: Number(formData.criteria_value)
+                    });
+                error = insertError;
+            }
 
 
             if (error) throw error;
 
-            toast.success("Logro creado exitosamente");
+            toast.success(achievementToEdit ? "Logro actualizado exitosamente" : "Logro creado exitosamente");
             setOpen(false);
             onAchievementCreated();
-            setFormData({
-                name: "",
-                description: "",
-                points: 10,
-                category: "milestone",
-                icon: "award",
-                criteria_type: "manual",
-                criteria_value: 1
-            });
+            if (!achievementToEdit) {
+                setFormData({
+                    name: "",
+                    description: "",
+                    points: 10,
+                    category: "milestone",
+                    icon: "award",
+                    criteria_type: "manual",
+                    criteria_value: 1
+                });
+            }
         } catch (error) {
             console.error("Error creating achievement:", error);
             toast.error("Error al crear el logro");
@@ -78,19 +136,20 @@ export function CreateAchievementDialog({ onAchievementCreated }: CreateAchievem
         }
     };
 
+    if (!isAdmin) return null;
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Nuevo Logro
+                <Button className="gap-2" variant={achievementToEdit ? "outline" : "default"} size={achievementToEdit ? "icon" : "default"}>
+                    {achievementToEdit ? <Pencil className="h-4 w-4" /> : <><Plus className="h-4 w-4" /> Nuevo Logro</>}
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Crear Nuevo Logro</DialogTitle>
+                    <DialogTitle>{achievementToEdit ? "Editar Logro" : "Crear Nuevo Logro"}</DialogTitle>
                     <DialogDescription>
-                        Define los detalles del nuevo logro para el sistema de gamificación.
+                        {achievementToEdit ? "Modifica los detalles del logro existente." : "Define los detalles del nuevo logro para el sistema de gamificación."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -118,8 +177,9 @@ export function CreateAchievementDialog({ onAchievementCreated }: CreateAchievem
                             <Input
                                 id="points"
                                 type="number"
+                                min="0" // Prevent negative input in UI
                                 value={formData.points}
-                                onChange={(e) => setFormData({ ...formData, points: Number(e.target.value) })}
+                                onChange={(e) => setFormData({ ...formData, points: Math.max(0, Number(e.target.value)) })}
                             />
                         </div>
                         <div className="grid gap-2">
@@ -162,8 +222,9 @@ export function CreateAchievementDialog({ onAchievementCreated }: CreateAchievem
                             <Input
                                 id="criteria_value"
                                 type="number"
+                                min="0" // Prevent negative input in UI
                                 value={formData.criteria_value}
-                                onChange={(e) => setFormData({ ...formData, criteria_value: Number(e.target.value) })}
+                                onChange={(e) => setFormData({ ...formData, criteria_value: Math.max(0, Number(e.target.value)) })}
                             />
                         </div>
                     </div>
@@ -218,9 +279,10 @@ export function CreateAchievementDialog({ onAchievementCreated }: CreateAchievem
                     </div>
                 </div>
                 <Button onClick={handleSubmit} disabled={loading}>
-                    {loading ? "Creando..." : "Crear Logro"}
+                    {loading ? (achievementToEdit ? "Actualizando..." : "Creando...") : (achievementToEdit ? "Actualizar Logro" : "Crear Logro")}
                 </Button>
             </DialogContent>
         </Dialog>
     );
+
 }
