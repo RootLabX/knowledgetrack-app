@@ -87,17 +87,20 @@ const LearningPath = () => {
       if (!user) return;
 
       // Fetch user courses
-      const { data: courses, error: coursesError } = await supabase
+      const { data: coursesData, error: coursesError } = await supabase
         .schema("mapper")
         .from("user_courses")
-        .select(`
-          *,
-          course:courses (*)
-        `)
+        .select("*, courses!fk_user_courses_courses(*)")
         .eq("user_id", user.id);
 
       if (coursesError) throw coursesError;
-      setUserCourses(courses || []);
+
+      const mappedCourses: UserCourse[] = (coursesData || []).map((item: any) => ({
+        ...item,
+        course: item.courses
+      }));
+
+      setUserCourses(mappedCourses);
 
       // Fetch latest assessment
       const { data: assessment, error: assessmentError } = await supabase
