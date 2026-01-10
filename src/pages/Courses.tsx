@@ -67,7 +67,7 @@ interface UserCourse {
 
 interface Profile {
   id: string;
-  user_id: string;
+  user_id?: string;
   full_name: string | null;
 }
 
@@ -211,7 +211,7 @@ const Courses = () => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name")
+        .select("*")
         .order("full_name", { ascending: true });
 
       if (error) throw error;
@@ -267,7 +267,7 @@ const Courses = () => {
       // Simplified: we already have 'profiles' in state if admin.
 
       const participants: Participant[] = (data || []).map((uc: any) => {
-        const profile = profiles.find(p => p.user_id === uc.user_id);
+        const profile = profiles.find(p => (p.user_id || p.id) === uc.user_id);
         return {
           user_id: uc.user_id,
           full_name: profile?.full_name || "Usuario Desconocido",
@@ -362,7 +362,7 @@ const Courses = () => {
         status: "assigned",
       }));
 
-      const { error } = await supabase.from("user_courses").insert(assignments);
+      const { error } = await supabase.schema("mapper").from("user_courses").insert(assignments);
 
       if (error) throw error;
 

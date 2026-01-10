@@ -284,19 +284,17 @@ const LearningPath = () => {
         calculatedTitle = "Desarrollador Mid-Level";
       }
 
-      // Fetch Positions via Requirements (Mapper Schema linked to Public)
+      // Fetch Positions via Requirements (Separate fetches to avoid join error)
       console.log("Fetching position requirements...");
+
+      // 1. Fetch Requirements
       const { data: requirementsData, error: reqError } = await supabase
         .schema("mapper")
         .from("position_requirements")
         .select(`
             level,
             requirements,
-            position:positions (
-                id,
-                name,
-                department_id
-            )
+            position_id
         `)
         .order("level", { ascending: true });
 
@@ -304,15 +302,23 @@ const LearningPath = () => {
         console.error("Error fetching requirements:", reqError);
       }
 
+      // 2. Fetch Positions Details
+      const { data: positionsData } = await supabase
+        .from("positions")
+        .select("id, name, department_id");
+
       if (requirementsData && requirementsData.length > 0) {
         // Transform joined data to flat Position structure
-        const mappedPositions = requirementsData.map((r: any) => ({
-          id: r.position.id,
-          title: r.position.name, // The real name from public.positions
-          department: 'Tecnología', // Hardcoded or fetch if possible, but map for now
-          level: r.level,
-          requirements: r.requirements
-        }));
+        const mappedPositions = requirementsData.map((r: any) => {
+          const positionParams = positionsData?.find(p => p.id === r.position_id);
+          return {
+            id: r.position_id,
+            title: positionParams?.name || "Posición Desconocida",
+            department: 'Tecnología', // Could map department_id if needed, keeping hardcoded for now as per original
+            level: r.level,
+            requirements: r.requirements
+          }
+        });
 
         setPositions(mappedPositions);
         console.log("Mapped Positions:", mappedPositions);

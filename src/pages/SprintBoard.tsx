@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 // 1. Importamos useNavigate
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 // 2. Importamos ArrowLeft
 import {
     Plus, MoreHorizontal, CircleDashed, CheckCircle2, Circle,
@@ -22,13 +22,15 @@ import {
 
 // --- TIPOS ---
 interface SprintBoardProps {
-    sprintId: string;
+    sprintId?: string;
 }
 
 // --- COMPONENTE PRINCIPAL ---
-export default function SprintBoard({ sprintId }: SprintBoardProps) {
+export default function SprintBoard({ sprintId: propSprintId }: SprintBoardProps = {}) {
     // 3. Inicializamos el hook de navegación
     const navigate = useNavigate();
+    const { sprintId: paramSprintId } = useParams();
+    const sprintId = propSprintId || paramSprintId;
 
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
@@ -43,6 +45,7 @@ export default function SprintBoard({ sprintId }: SprintBoardProps) {
     }, [sprintId]);
 
     const loadData = async () => {
+        if (!sprintId) return;
         try {
             setLoading(true);
             const [sprintData, tasksData] = await Promise.all([
