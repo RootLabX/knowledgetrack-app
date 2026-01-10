@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +24,8 @@ import {
     MoreHorizontal,
     Pencil,
     Trash2,
-    BarChart3
+    BarChart3,
+    Eye
 } from "lucide-react";
 import {
     Dialog,
@@ -82,6 +84,10 @@ const Objectives = () => {
 
     // For deletion confirmation
     const [deleteId, setDeleteId] = useState<string | null>(null);
+
+    // View Details State
+    const [viewObjective, setViewObjective] = useState<StrategicObjective | null>(null);
+    const [isViewOpen, setIsViewOpen] = useState(false);
 
     const [currentObj, setCurrentObj] = useState<Partial<StrategicObjective>>({
         title: "",
@@ -392,6 +398,89 @@ const Objectives = () => {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* View Details Dialog */}
+                <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+                    <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl">{viewObjective?.title}</DialogTitle>
+                            <DialogDescription>Detalles del objetivo estratégico</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-6 py-4">
+                            <div className="grid gap-2">
+                                <Label className="text-muted-foreground text-xs font-semibold uppercase">Descripción</Label>
+                                <p className="text-sm bg-muted/30 p-3 rounded-md border">{viewObjective?.description}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground text-xs font-semibold uppercase">Departamento</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline">
+                                            {departments?.find(d => d.id === viewObjective?.department_id)?.name || "Sin asignar"}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground text-xs font-semibold uppercase">Estado</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant={viewObjective && calculateProgress(viewObjective.kpi_current, viewObjective.kpi_target) >= 100 ? "default" : "secondary"}>
+                                            {viewObjective && calculateProgress(viewObjective.kpi_current, viewObjective.kpi_target) >= 100 ? "Completado" : "En Progreso"}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-muted/20 p-4 rounded-lg border space-y-3">
+                                <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <Target className="h-4 w-4 text-primary" /> Métricas del KPI
+                                </h4>
+                                <div className="grid grid-cols-3 gap-4 text-center">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground mb-1">Métrica</p>
+                                        <p className="font-medium text-sm">{viewObjective?.kpi_metric}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground mb-1">Actual</p>
+                                        <p className="font-bold text-lg text-primary">
+                                            {viewObjective?.kpi_current} <span className="text-xs font-normal text-muted-foreground">{viewObjective?.kpi_unit}</span>
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground mb-1">Meta</p>
+                                        <p className="font-bold text-lg">
+                                            {viewObjective?.kpi_target} <span className="text-xs font-normal text-muted-foreground">{viewObjective?.kpi_unit}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="space-y-1 pt-2">
+                                    <div className="flex justify-between text-xs">
+                                        <span>Progreso</span>
+                                        <span className="font-medium">{viewObjective ? Math.round(calculateProgress(viewObjective.kpi_current, viewObjective.kpi_target)) : 0}%</span>
+                                    </div>
+                                    <Progress value={viewObjective ? calculateProgress(viewObjective.kpi_current, viewObjective.kpi_target) : 0} className="h-2" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground text-xs font-semibold uppercase">Fecha Límite</Label>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        {viewObjective?.deadline && format(new Date(viewObjective.deadline), "dd 'de' MMMM, yyyy", { locale: es })}
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground text-xs font-semibold uppercase">ID Sistema</Label>
+                                    <p className="text-xs font-mono text-muted-foreground">{viewObjective?.id}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={() => setIsViewOpen(false)}>Cerrar</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <Tabs defaultValue="management" className="w-full">
@@ -416,6 +505,12 @@ const Objectives = () => {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => {
+                                                    setViewObjective(obj);
+                                                    setIsViewOpen(true);
+                                                }}>
+                                                    <Eye className="mr-2 h-4 w-4" /> Ver Detalles
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => openEdit(obj)}>
                                                     <Pencil className="mr-2 h-4 w-4" /> Editar
                                                 </DropdownMenuItem>
@@ -455,7 +550,17 @@ const Objectives = () => {
                                         </div>
                                     </CardContent>
                                     <CardFooter className="pt-2 border-t bg-muted/5 flex justify-between">
-                                        <span className="text-xs text-muted-foreground">ID: {obj.id.slice(0, 8)}</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-xs text-muted-foreground hover:text-primary px-2 -ml-2"
+                                            onClick={() => {
+                                                setViewObjective(obj);
+                                                setIsViewOpen(true);
+                                            }}
+                                        >
+                                            <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver Detalle
+                                        </Button>
                                         <div className="flex items-center gap-1 text-xs font-medium">
                                             {isCompleted ? (
                                                 <><CheckCircle2 className="h-3 w-3 text-green-600" /> Meta Alcanzada</>
@@ -502,7 +607,7 @@ const Objectives = () => {
                                     <XAxis dataKey="name" />
                                     <YAxis domain={[0, 100]} unit="%" />
                                     <Tooltip
-                                        formatter={(value: number) => [`${value}%`, 'Cumplimiento Promedio']}
+                                        formatter={(value: number) => [`${value}% `, 'Cumplimiento Promedio']}
                                         labelStyle={{ color: 'black' }}
                                     />
                                     <Bar dataKey="cumplimiento" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Cumplimiento %" />

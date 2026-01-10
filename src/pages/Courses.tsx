@@ -52,6 +52,12 @@ interface Course {
   link?: string;
   start_date?: string | null;
   end_date?: string | null;
+  department_id?: string | null;
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 interface UserCourse {
@@ -105,12 +111,14 @@ export const DIFFICULTIES = [
 ];
 
 const Courses = () => {
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth(); // Renamed to currentUser to avoid conflict with 'user' in snippet
+  const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [userCourses, setUserCourses] = useState<UserCourse[]>([]);
-  const [courseStats, setCourseStats] = useState<CourseStats>({});
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState<Department[]>([]); // Added departments state
+  const [userDepartment, setUserDepartment] = useState<string | null>(null); // Added userDepartment state
+
+  // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -122,25 +130,30 @@ const Courses = () => {
   const [participantsDialogOpen, setParticipantsDialogOpen] = useState(false);
   const [completedDialogOpen, setCompletedDialogOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [courseStats, setCourseStats] = useState<CourseStats>({});
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+
   const [courseForm, setCourseForm] = useState({
     title: "",
     description: "",
     category: "",
     duration_hours: "",
     difficulty: "",
-
     objectives: "",
     link: "",
     start_date: "",
     end_date: "",
+    department_id: "", // Added department_id to form state
   });
 
   useEffect(() => {
     checkAdminRole();
-  }, [user]);
+    fetchDepartments(); // Fetch departments on initial load
+    fetchUserDepartment(); // Fetch user's department on initial load
+  }, []);
 
   useEffect(() => {
-    if (user) {
+    if (currentUser) {
       fetchCourses();
       if (isAdmin) {
         fetchProfiles();
@@ -149,15 +162,15 @@ const Courses = () => {
         fetchUserCourses();
       }
     }
-  }, [user, isAdmin]);
+  }, [currentUser, isAdmin, userDepartment]); // Refetch when role or department is known
 
   const checkAdminRole = async () => {
-    if (!user) return;
+    if (!currentUser) return;
     try {
       const { data } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .eq("role", "admin")
         .maybeSingle();
 
@@ -167,17 +180,49 @@ const Courses = () => {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase.from("departments").select("id, name");
+      if (error) throw error;
+      if (data) setDepartments(data);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+    }
+  };
+
+  const fetchUserDepartment = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data, error } = await supabase.from("profiles").select("department").eq("id", user.id).single();
+      if (error) console.error("Error fetching user department:", error);
+      if (data) setUserDepartment(data.department);
+    }
+  };
+
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .schema("mapper")
         .from("courses")
         .select("*")
         .order("created_at", { ascending: false });
 
+      const { data, error } = await query;
+
       if (error) throw error;
-      setCourses(data || []);
+
+      let fetchedCourses = data || [];
+
+      // Filter by department if not admin and user has department
+      if (!isAdmin && userDepartment) {
+        const userDeptId = departments.find(d => d.name === userDepartment)?.id;
+        if (userDeptId) {
+          fetchedCourses = fetchedCourses.filter((c: Course) => !c.department_id || c.department_id === userDeptId);
+        }
+      }
+
+      setCourses(fetchedCourses);
     } catch (error) {
       console.error("Error fetching courses:", error);
       toast.error("Error al cargar los cursos");
@@ -187,7 +232,7 @@ const Courses = () => {
   };
 
   const fetchUserCourses = async () => {
-    if (!user) return;
+    if (!currentUser) return;
     try {
       const { data, error } = await supabase
         .schema("mapper")
@@ -196,7 +241,7 @@ const Courses = () => {
             *,
             course:courses(*)
           `)
-        .eq("user_id", user.id);
+        .eq("user_id", currentUser.id);
 
       if (error) throw error;
       setUserCourses(data as unknown as UserCourse[] || []);
@@ -289,7 +334,7 @@ const Courses = () => {
   };
 
   const handleUpdateProgress = async (courseId: string, newProgress: number) => {
-    if (!user) return;
+    if (!currentUser) return;
 
     // Find existing user course
     const existingUserCourse = userCourses.find(uc => uc.course_id === courseId);
@@ -324,7 +369,7 @@ const Courses = () => {
           .schema("mapper")
           .from("user_courses")
           .insert({
-            user_id: user.id,
+            user_id: currentUser.id,
             course_id: courseId,
             progress: newProgress,
             status: 'in_progress',
@@ -412,6 +457,7 @@ const Courses = () => {
       link: "",
       start_date: "",
       end_date: "",
+      department_id: "", // Reset department_id
     });
   };
 
@@ -439,16 +485,11 @@ const Courses = () => {
           objectives: objectives.length > 0 ? objectives : null,
           start_date: courseForm.start_date || null,
           end_date: courseForm.end_date || null,
+          department_id: courseForm.department_id || null, // Added department_id
           // link: courseForm.link || null, // Assuming link field exists now? Wait, user requirement mentioned link. 
           // I need to check schema if 'link' exists on course. 
           // For now let's assume I need to add it or it might not be in DB yet.
           // Wait, 'link' was requested in the card. It's likely NOT in the DB yet based on previous `types.ts` view.
-          // I should probably add it or mocked it. But the Prompt said "Link del curso" to be displayed.
-          // If it's not in DB, I can't save it. 
-          // Let's assume for this step I will try to add it, but if it fails I'll remove.
-          // Actually, looking at `types.ts` previously, `courses` table:
-          // category, created_at, description, difficulty, duration_hours, id, is_active, objectives, title, updated_at
-          // NO "link" field.
           // I cannot add "link" to insert without migration.
           // However, for the purpose of the UI "requirement", maybe I should just add a placeholder or asked user?
           // I'll stick to what I can do. I can't modify schema without SQL.
@@ -494,6 +535,7 @@ const Courses = () => {
       link: course.link || "",
       start_date: course.start_date || "",
       end_date: course.end_date || "",
+      department_id: course.department_id || "", // Set department_id for editing
     });
     setEditDialogOpen(true);
   };

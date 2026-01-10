@@ -18,6 +18,7 @@ export interface PlanningObjective {
   start_date?: string;
   end_date?: string;
   status?: string;
+  department_id?: string;
 }
 
 export interface PlanningListResponse {
@@ -31,6 +32,7 @@ export interface CreatePlanningPayload {
   start_date?: string | null;
   end_date?: string | null;
   status?: string;
+  department_id?: string | null;
 }
 
 export interface CreateSprintDTO {
@@ -83,9 +85,9 @@ export async function fetchPlanningList(): Promise<PlanningListResponse> {
   }
 
   // Devolvemos un mapa vacío ya que no calculamos progreso en cliente por ahora
-  return { 
-    objectives: (data as PlanningObjective[]) || [], 
-    progressMap: {} 
+  return {
+    objectives: (data as PlanningObjective[]) || [],
+    progressMap: {}
   };
 }
 

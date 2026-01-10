@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ArrowRight, Calendar as CalendarIcon, MoreHorizontal, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -16,6 +17,12 @@ import {
 
 import { usePlanning } from "@/hooks/usePlanning";
 import { CreatePlanningDialog } from "@/components/planning/CreatePlanningDialog";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Department {
+  id: string;
+  name: string;
+}
 
 const statusLabelMap: Record<string, string> = {
   in_progress: "En progreso",
@@ -32,6 +39,37 @@ const statusBadgeClasses: Record<string, string> = {
 const Planning = () => {
   const { objectives, progressMap, loading, createPlanning } = usePlanning();
   const navigate = useNavigate();
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [userDepartment, setUserDepartment] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch Departments
+      const { data: depts } = await supabase.from("departments").select("id, name");
+      if (depts) setDepartments(depts);
+
+      // Fetch User Profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("department")
+          .eq("id", user.id)
+          .single();
+        if (profile) setUserDepartment(profile.department);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const getFilteredObjectives = () => {
+    if (!userDepartment) return objectives;
+    const dept = departments.find(d => d.name === userDepartment);
+    if (!dept) return objectives;
+    return objectives.filter(obj => !obj.department_id || obj.department_id === dept.id);
+  };
+
+  const filteredObjectives = getFilteredObjectives();
 
   if (loading) {
     return (
@@ -49,29 +87,34 @@ const Planning = () => {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900" id="planningHeader">
             Planificación
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Gestiona tus ciclos de objetivos y capacitaciones
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground">
+              Gestiona tus ciclos de objetivos y capacitaciones
+            </p>
+            {userDepartment && <Badge variant="outline">{userDepartment}</Badge>}
+          </div>
         </div>
 
-        <CreatePlanningDialog onCreate={createPlanning} />
+        <CreatePlanningDialog onCreate={createPlanning} departments={departments} />
       </div>
 
       {/* Content Grid */}
-      {objectives.length === 0 ? (
+      {filteredObjectives.length === 0 ? (
         <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed border-gray-200">
           <div className="mx-auto h-12 w-12 text-gray-300 mb-4">
             <Plus className="h-full w-full" />
           </div>
           <h3 className="text-lg font-medium text-gray-900">No hay planificaciones</h3>
           <p className="text-gray-500 mt-1 mb-4">
-            Comienza creando tu primera planificación anual o trimestral.
+            {userDepartment
+              ? `No hay planificaciones para el departamento ${userDepartment}.`
+              : "Comienza creando tu primera planificación anual o trimestral."}
           </p>
-          <CreatePlanningDialog onCreate={createPlanning} />
+          <CreatePlanningDialog onCreate={createPlanning} departments={departments} />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="planningGrid">
-          {objectives.map((objective) => {
+          {filteredObjectives.map((objective) => {
             const statusKey = objective.status ?? "in_progress";
             const statusLabel = statusLabelMap[statusKey] ?? "En progreso";
             const statusClasses =
@@ -101,7 +144,6 @@ const Planning = () => {
                     <Badge variant="secondary" className={statusClasses}>
                       {statusLabel}
                     </Badge>
-
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

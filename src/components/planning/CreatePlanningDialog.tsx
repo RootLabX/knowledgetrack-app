@@ -12,17 +12,25 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface Department {
+  id: string;
+  name: string;
+}
 
 interface CreatePlanningDialogProps {
+  departments?: Department[];
   onCreate: (data: {
     title: string;
     description?: string | null;
     start_date?: string | null;
     end_date?: string | null;
+    department_id?: string | null;
   }) => Promise<void> | void;
 }
 
-export function CreatePlanningDialog({ onCreate }: CreatePlanningDialogProps) {
+export function CreatePlanningDialog({ onCreate, departments = [] }: CreatePlanningDialogProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,6 +38,7 @@ export function CreatePlanningDialog({ onCreate }: CreatePlanningDialogProps) {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,12 +51,14 @@ export function CreatePlanningDialog({ onCreate }: CreatePlanningDialogProps) {
         description: description.trim() || null,
         start_date: startDate || null,
         end_date: endDate || null,
+        department_id: departmentId || null,
       });
       setOpen(false);
       setTitle("");
       setDescription("");
       setStartDate("");
       setEndDate("");
+      setDepartmentId("");
     } finally {
       setSubmitting(false);
     }
@@ -80,6 +91,20 @@ export function CreatePlanningDialog({ onCreate }: CreatePlanningDialogProps) {
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="planningDepartment">Departamento</Label>
+              <Select value={departmentId} onValueChange={setDepartmentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar (Opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
