@@ -10,6 +10,7 @@ import Assessment from "./pages/Assessment";
 import Courses from "./pages/Courses";
 import Planning from "./pages/Planning";
 import Objectives from "./pages/Objectives";
+import PlanningDetail from "./pages/PlanningDetail";
 import LearningPath from "./pages/LearningPath";
 import Team from "./pages/Team";
 import Reports from "./pages/Reports";
@@ -18,6 +19,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Achievements from "./pages/Achievements";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import SprintBoard from "./pages/SprintBoard";
+import SprintPage from "./pages/SprintPage";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +73,24 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/planning/:planId"
+              element={
+                <ProtectedRoute>
+                  <PlanningDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/planning/board/:sprintId" element={
+              <ProtectedRoute>
+                <SprintBoard />
+              </ProtectedRoute>
+            } />
+            <Route path="/planning/sprint/:sprintId" element={
+              <ProtectedRoute>
+                <SprintPage />
+              </ProtectedRoute>
+            } />
             <Route
               path="/learning-path"
               element={

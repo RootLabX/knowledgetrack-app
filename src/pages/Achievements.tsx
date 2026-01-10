@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Award, Trophy, Zap, Users } from "lucide-react";
+import { Award, Trophy, Zap, Users, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { AchievementCard } from "@/components/gamification/AchievementCard";
 
 import { Leaderboard } from "@/components/gamification/Leaderboard";
-import { CreateAchievementDialog } from "@/components/gamification/CreateAchievementDialog";
+import { AchievementManagement } from "@/components/gamification/AchievementManagement";
 import { EmployeeList } from "@/components/gamification/EmployeeList";
 
 interface Achievement {
@@ -34,6 +34,27 @@ const Achievements = () => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleDataRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      setIsAdmin(!!data);
+    };
+    checkAdmin();
+  }, [user]);
 
 
   const fetchData = useCallback(async () => {
@@ -86,7 +107,7 @@ const Achievements = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   useEffect(() => {
     fetchData();
@@ -139,7 +160,7 @@ const Achievements = () => {
             </div>
             <div>
               <p className="text-3xl font-bold">{totalPoints}</p>
-              <p className="text-sm text-muted-foreground">Puntos Totales</p>
+              <p className="text-sm text-muted-foreground">Total Histórico</p>
             </div>
           </CardContent>
         </Card>
@@ -197,17 +218,19 @@ const Achievements = () => {
             <Users className="h-4 w-4" />
             Colaboradores
           </TabsTrigger>
-
+          {isAdmin && (
+            <TabsTrigger value="administration" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Administración
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="leaderboard">
-          <Leaderboard />
+          <Leaderboard key={refreshTrigger} />
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-4">
-          <div className="flex justify-end">
-            <CreateAchievementDialog onAchievementCreated={fetchData} />
-          </div>
           <div className="grid gap-4 md:grid-cols-2">
             {achievements.map((achievement) => (
               <AchievementCard
@@ -220,8 +243,14 @@ const Achievements = () => {
         </TabsContent>
 
         <TabsContent value="employees">
-          <EmployeeList />
+          <EmployeeList key={refreshTrigger} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="administration">
+            <AchievementManagement onUpdate={handleDataRefresh} />
+          </TabsContent>
+        )}
 
 
       </Tabs>
