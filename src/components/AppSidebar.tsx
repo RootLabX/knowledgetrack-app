@@ -1,6 +1,7 @@
 import {
   Award,
   BarChart3,
+  ChartBar,
   BookOpen,
   Brain,
   GraduationCap,
@@ -28,6 +29,7 @@ import {
 const mainNavItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Evaluaciones", url: "/assessment", icon: Brain },
+  { title: "Objetivos", url: "/objectives", icon: Target },
   { title: "Cursos", url: "/courses", icon: BookOpen },
   { title: "Planificación", url: "/planning", icon: Target },
   { title: "Ruta de Aprendizaje", url: "/learning-path", icon: GraduationCap },
@@ -37,6 +39,7 @@ const mainNavItems = [
 const managementItems = [
   { title: "Equipo", url: "/team", icon: Users },
   { title: "Reportes", url: "/reports", icon: BarChart3 },
+  { title: "Analítica Avanzada", url: "/analytics", icon: ChartBar },
   { title: "Admin Dashboard", url: "/admin", icon: LayoutDashboard },
   { title: "Configuración", url: "/settings", icon: Settings },
 ];

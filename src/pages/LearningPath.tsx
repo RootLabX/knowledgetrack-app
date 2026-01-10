@@ -13,12 +13,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+
   AlertCircle,
   BookOpen,
   CheckCircle2,
   Clock,
   Target,
   TrendingUp,
+  Award,
+  Briefcase,
+  Users,
+  MessageSquare,
+  Star,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +59,22 @@ interface AssessmentResult {
   percentage: number;
 }
 
+interface Position {
+  id: string;
+  title: string;
+  department: string;
+  level: number;
+  requirements: any; // JSONB
+}
+
+interface Feedback360 {
+  id: string;
+  relationship: 'peer' | 'manager' | 'subordinate';
+  content: string;
+  rating: number;
+  created_at: string;
+}
+
 const SECTION_NAMES: Record<string, string> = {
   git: "Git y Control de Versiones",
   sql: "SQL y Bases de Datos",
@@ -65,8 +87,119 @@ const SECTION_NAMES: Record<string, string> = {
   teamwork: "Trabajo en Equipo",
 };
 
+const SECTION_IMPORTANCE: Record<string, 'high' | 'medium' | 'low'> = {
+  security: 'high',
+  sql: 'high',
+  devops: 'high',
+  git: 'high',
+  patterns: 'medium',
+  frontend: 'medium',
+  networks: 'medium',
+  ai: 'medium',
+  teamwork: 'low',
+};
+
+const SECTION_URGENCY: Record<string, 'high' | 'medium' | 'low'> = {
+  devops: 'high',    // "Operar hoy"
+  git: 'high',       // Fundamental
+  sql: 'high',       // Fundamental
+  networks: 'medium',
+  frontend: 'medium',
+  security: 'medium', // Important but often comes after basics
+  patterns: 'low',
+  ai: 'low',         // Advanced
+  teamwork: 'low',
+};
+
+const SECTION_DIFFICULTY: Record<string, 'high' | 'medium' | 'low'> = {
+  ai: 'high',
+  security: 'high',
+  devops: 'medium',
+  patterns: 'medium',
+  networks: 'medium',
+  sql: 'medium',
+  frontend: 'medium',
+  git: 'low',
+  teamwork: 'low',
+};
+
+const PREREQUISITES: Record<string, string[]> = {
+  ai: ['sql', 'patterns'], // Logic + Data
+  security: ['networks', 'devops'],
+  patterns: ['git'], // Code management
+  devops: ['git', 'networks'],
+  frontend: ['git'],
+  // sql, git, networks are foundations
+};
+
+const SMART_OBJECTIVES: Record<string, string> = {
+  devops: "Desplegar una aplicación containerizada usando Docker y un pipeline básico de CI/CD en 3 meses.",
+  git: "Gestionar el flujo de trabajo de un equipo usando GitFlow, resolviendo conflictos y usando ramas de feature/hotfix.",
+  sql: "Diseñar y optimizar un esquema de base de datos relacional normalizado y escribir consultas complejas con JOINs y agregaciones.",
+  security: "Implementar autenticación segura (OAuth/JWT) y protección contra OWASP Top 10 en una aplicación web.",
+  patterns: "Refactorizar un módulo legacy aplicando 3 patrones de diseño (Singleton, Factory, Observer) para mejorar mantenibilidad.",
+  frontend: "Crear una SPA reactiva y accesible que consuma APIs REST, manejando estado global y navegación.",
+  networks: "Configurar y asegurar una red virtual básica, entendiendo DNS, HTTP/S y Firewalls.",
+  ai: "Entrenar y desplegar un modelo básico de ML o integrar una API de LLM para una tarea específica de negocio.",
+  teamwork: "Liderar una Code Review efectiva y documentar una decisión técnica arquitectónica (ADR).",
+};
+
+const IMPORTANCE_WEIGHTS = { high: 3, medium: 2, low: 1 };
+const URGENCY_WEIGHTS = { high: 3, medium: 2, low: 1 };
+const DIFFICULTY_WEIGHTS = { high: 3, medium: 2, low: 1 }; // Higher difficulty = Lower priority score usually? Or just info.
+
+// Helper Component for RoadmapCard (Hoisted)
+const RoadmapCard = ({ item }: { item: any }) => {
+  const urgencyColor = item.urgency === 'high' ? 'text-destructive' : item.urgency === 'medium' ? 'text-warning' : 'text-muted-foreground';
+  const difficultyLabel = item.difficulty === 'high' ? 'Difícil' : item.difficulty === 'medium' ? 'Medio' : 'Fácil';
+
+  return (
+    <div className="rounded-md border bg-card p-3 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start mb-2">
+        <h4 className="font-semibold text-sm line-clamp-1" title={SECTION_NAMES[item.section]}>
+          {SECTION_NAMES[item.section]}
+        </h4>
+        <Badge variant="outline" className="text-[10px] h-5">
+          {100 - item.percentage}% Brecha
+        </Badge>
+      </div>
+
+      {/* Metrics Row */}
+      <div className="flex gap-2 text-xs mb-3">
+        <span className={`flex items-center gap-1 font-medium ${urgencyColor}`}>
+          <AlertCircle className="w-3 h-3" /> {item.urgency === 'high' ? 'Urgente' : item.urgency === 'medium' ? 'Necesario' : 'Opcional'}
+        </span>
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Clock className="w-3 h-3" /> {difficultyLabel}
+        </span>
+      </div>
+
+      {/* SMART Goal */}
+      <div className="bg-muted/50 p-2 rounded text-xs text-muted-foreground italic border-l-2 border-primary/50 relative">
+        <span className="font-semibold not-italic block mb-0.5 text-[10px] uppercase text-primary">Objetivo:</span>
+        "{item.smartGoal}"
+      </div>
+
+      {/* Dependencies */}
+      {item.prerequisites.length > 0 && (
+        <div className="mt-2 pt-2 border-t flex flex-wrap gap-1">
+          <span className="text-[10px] text-muted-foreground mr-1">Requiere:</span>
+          {item.prerequisites.map((p: string) => (
+            <Badge key={p} variant="secondary" className="text-[10px] h-4 px-1">
+              {SECTION_NAMES[p]?.split(' ')[0]}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
 const LearningPath = () => {
   const navigate = useNavigate();
+  // ... existing hooks ...
   const { user } = useAuth();
   const { checkAndUnlockAchievements } = useAchievements();
   const [userCourses, setUserCourses] = useState<UserCourse[]>([]);
@@ -76,8 +209,16 @@ const LearningPath = () => {
   const [newProgress, setNewProgress] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);
+
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
 
+  // New State for Career Pathing & Feedback
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback360[]>([]);
+  const [currentPosition, setCurrentPosition] = useState<Position | null>(null);
+  const [nextPosition, setNextPosition] = useState<Position | null>(null);
+
+  // ... useEffect and fetchData ...
   useEffect(() => {
     fetchData();
   }, [user]);
@@ -124,6 +265,98 @@ const LearningPath = () => {
         }));
         setAssessmentResults(results);
       }
+
+      // Calculate Profile based on Average Score
+      const totalScore = assessment?.results
+        ? Object.values(assessment.results).reduce((acc: number, curr: any) => acc + curr.percentage, 0)
+        : 0;
+      const sectionCount = assessment?.results ? Object.keys(assessment.results).length : 1;
+      const averageScore = totalScore / sectionCount;
+
+      let calculatedLevel = 1;
+      let calculatedTitle = "Desarrollador Junior";
+
+      if (averageScore >= 85) {
+        calculatedLevel = 3;
+        calculatedTitle = "Desarrollador Senior";
+      } else if (averageScore >= 50) {
+        calculatedLevel = 2;
+        calculatedTitle = "Desarrollador Mid-Level";
+      }
+
+      // Fetch Positions via Requirements (Mapper Schema linked to Public)
+      console.log("Fetching position requirements...");
+      const { data: requirementsData, error: reqError } = await supabase
+        .schema("mapper")
+        .from("position_requirements")
+        .select(`
+            level,
+            requirements,
+            position:positions (
+                id,
+                name,
+                department_id
+            )
+        `)
+        .order("level", { ascending: true });
+
+      if (reqError) {
+        console.error("Error fetching requirements:", reqError);
+      }
+
+      if (requirementsData && requirementsData.length > 0) {
+        // Transform joined data to flat Position structure
+        const mappedPositions = requirementsData.map((r: any) => ({
+          id: r.position.id,
+          title: r.position.name, // The real name from public.positions
+          department: 'Tecnología', // Hardcoded or fetch if possible, but map for now
+          level: r.level,
+          requirements: r.requirements
+        }));
+
+        setPositions(mappedPositions);
+        console.log("Mapped Positions:", mappedPositions);
+
+        // Find position matching calculated level
+        const current = mappedPositions.find((p: any) => p.level === calculatedLevel) ||
+          mappedPositions[0];
+
+        setCurrentPosition(current);
+
+        // Target is ALWAYS Senior (Level 3)
+        const seniorPosition = mappedPositions.find((p: any) => p.level === 3);
+        setNextPosition(seniorPosition || null);
+
+      } else {
+        // Fallback logic
+        console.warn("No positions found in DB (requirements joined), using calculated fallback");
+        setCurrentPosition({
+          id: 'fallback-current',
+          title: calculatedTitle,
+          department: 'Tecnología',
+          level: calculatedLevel,
+          requirements: {}
+        });
+        setNextPosition({
+          id: 'fallback-next',
+          title: 'Desarrollador Senior',
+          department: 'Tecnología',
+          level: 3,
+          requirements: {}
+        });
+      }
+
+      // Fetch 360 Feedback (Mapper Schema)
+      const { data: feedbackData } = await supabase
+        .schema("mapper")
+        .from("feedback_360")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (feedbackData) {
+        setFeedbacks(feedbackData);
+      }
     } catch (error) {
       console.error("Error fetching learning path data:", error);
       toast.error("Error al cargar la ruta de aprendizaje");
@@ -132,6 +365,7 @@ const LearningPath = () => {
     }
   };
 
+  // ... existing handlers ...
   const handleUpdateProgress = async () => {
     if (!selectedCourse || !user) return;
     setUpdating(true);
@@ -180,32 +414,49 @@ const LearningPath = () => {
     }
   };
 
-  const getPriorityFromPercentage = (percentage: number) => {
-    if (percentage < 50) return "high";
-    if (percentage < 70) return "medium";
-    return "low";
+  const calculateAdvancedScore = (section: string, percentage: number) => {
+    const importance = SECTION_IMPORTANCE[section] || 'medium';
+    const urgency = SECTION_URGENCY[section] || 'medium';
+    const difficulty = SECTION_DIFFICULTY[section] || 'medium';
+
+    const gap = 100 - percentage;
+    const gapScore = gap / 10; // 0-10
+
+    // Check if this section is a prerequisite for others
+    let prerequisiteScore = 0;
+    Object.values(PREREQUISITES).forEach(deps => {
+      if (deps.includes(section)) prerequisiteScore += 1;
+    });
+
+    // Score Formula:
+    // (Urgency * 2) + (Gap * 1.5) + (Impact * 1) + (Prereq * 2) - (Difficulty * 0.5)
+    const score =
+      (URGENCY_WEIGHTS[urgency] * 2.0) +
+      (gapScore * 1.5) +
+      (IMPORTANCE_WEIGHTS[importance] * 1.0) +
+      (prerequisiteScore * 2.0) -
+      (DIFFICULTY_WEIGHTS[difficulty] * 0.5);
+
+    return score;
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-destructive text-destructive-foreground";
-      case "medium":
-        return "bg-warning text-warning-foreground";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
+  const getPhase = (result: any) => {
+    const urgency = SECTION_URGENCY[result.section] || 'medium';
+    const hasPrereqs = (PREREQUISITES[result.section] || []).length > 0;
+    const isFoundation = !hasPrereqs; // No prereqs = Foundation
 
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "Alta";
-      case "medium":
-        return "Media";
-      default:
-        return "Baja";
+    // Phase 1: High Urgency OR Foundations (that have a gap)
+    if (urgency === 'high' || (isFoundation && result.percentage < 70)) {
+      return 1;
     }
+
+    // Phase 3: Low Urgency AND High Difficulty (Advanced)
+    if (urgency === 'low' && SECTION_DIFFICULTY[result.section] === 'high') {
+      return 3;
+    }
+
+    // Phase 2: Everything else (Expansion)
+    return 2;
   };
 
   const getStatusBadge = (status: string) => {
@@ -234,6 +485,28 @@ const LearningPath = () => {
     );
   }
 
+  // Prepare Data for Roadmap
+  const enrichedResults = assessmentResults.map(r => ({
+    ...r,
+    score: calculateAdvancedScore(r.section, r.percentage),
+    phase: 0, // placeholder
+    urgency: SECTION_URGENCY[r.section] || 'medium',
+    difficulty: SECTION_DIFFICULTY[r.section] || 'medium',
+    prerequisites: PREREQUISITES[r.section] || [],
+    smartGoal: SMART_OBJECTIVES[r.section]
+  }));
+
+  // Assign Phases
+  enrichedResults.forEach(r => {
+    r.phase = getPhase(r);
+  });
+
+  const phases = {
+    1: enrichedResults.filter(r => r.phase === 1).sort((a, b) => b.score - a.score),
+    2: enrichedResults.filter(r => r.phase === 2).sort((a, b) => b.score - a.score),
+    3: enrichedResults.filter(r => r.phase === 3).sort((a, b) => b.score - a.score),
+  };
+
   return (
     <>
       {showAchievementNotification && unlockedAchievements.length > 0 && (
@@ -247,7 +520,7 @@ const LearningPath = () => {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Mi Ruta de Aprendizaje</h1>
             <p className="text-muted-foreground">
-              Plan personalizado basado en tu evaluación inicial
+              Plan estratégico de capacitación basado en evaluación y rol
             </p>
           </div>
           <Button onClick={() => navigate("/assessment")}>
@@ -256,61 +529,186 @@ const LearningPath = () => {
           </Button>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Assessment Results */}
-            {assessmentResults.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-primary" />
-                    Análisis de Brechas de Conocimiento
-                  </CardTitle>
-                  <CardDescription>
-                    Basado en tu última evaluación técnica
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {assessmentResults
-                    .sort((a, b) => a.percentage - b.percentage)
-                    .map((result) => {
-                      const priority = getPriorityFromPercentage(result.percentage);
-                      const gap = 100 - result.percentage;
-                      return (
-                        <div key={result.section} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium text-foreground">
-                                {SECTION_NAMES[result.section] || result.section}
-                              </span>
-                              <Badge className={getPriorityColor(priority)}>
-                                {getPriorityLabel(priority)}
-                              </Badge>
+        <div className="grid gap-6 lg:grid-cols-1"> {/* Changed to 1 column for full width */}
+          <div className="lg:col-span-1 space-y-6"> {/* Main content now spans 1 column */}
+            {/* Career Path & Feedback Section */}
+            {(currentPosition || feedbacks.length > 0) && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Career Ladder */}
+                <Card className="border-l-4 border-l-primary/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Briefcase className="w-5 h-5 text-primary" /> Mi Trayectoria Profesional
+                    </CardTitle>
+                    <CardDescription>
+                      Ruta de crecimiento en el departamento {currentPosition?.department}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="relative border-l-2 border-muted pl-4 ml-2 space-y-6 my-2">
+                      {/* Current Position */}
+                      <div className="relative">
+                        <span className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-primary border-2 border-background ring-4 ring-primary/20"></span>
+                        <h4 className="font-semibold text-sm text-primary">Perfil Calculado (vía Evaluación)</h4>
+                        <p className="font-bold">{currentPosition?.title}</p>
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant="outline">Nivel {currentPosition?.level}</Badge>
+                          {assessmentResults.length > 0 && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Promedio: {Math.round(assessmentResults.reduce((a, b) => a + b.percentage, 0) / assessmentResults.length)}%
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Next Step */}
+                      {nextPosition ? (
+                        <div className="relative">
+                          <span className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-muted-foreground/30 border-2 border-background"></span>
+                          <h4 className="font-semibold text-sm text-muted-foreground">Objetivo: Senior</h4>
+                          <p className="font-bold text-foreground">{nextPosition.title}</p>
+                          <div className="mt-2 bg-muted/50 p-2 rounded text-xs">
+                            <span className="font-semibold block mb-1">Brechas para Senior:</span>
+                            {/* Calculated Gaps for Senior */}
+                            <div className="flex flex-col gap-1 mt-1">
+                              {assessmentResults
+                                .filter(r => r.percentage < 85) // Gap if < 85% (Senior threshold)
+                                .sort((a, b) => a.percentage - b.percentage)
+                                .slice(0, 3)
+                                .map(gap => (
+                                  <div key={gap.section} className="flex justify-between items-center">
+                                    <span className="capitalize">{SECTION_NAMES[gap.section]?.split(' ')[0]}</span>
+                                    <Badge variant="destructive" className="text-[10px] h-4">
+                                      falta {85 - gap.percentage}%
+                                    </Badge>
+                                  </div>
+                                ))}
+                              {assessmentResults.every(r => r.percentage >= 85) && (
+                                <span className="text-green-600 font-medium">¡Listo para Senior!</span>
+                              )}
                             </div>
-                            <span className="text-sm text-muted-foreground">
-                              {result.percentage}%
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <span className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-yellow-500 border-2 border-background"></span>
+                          <p className="font-bold text-foreground">¡Cima Alcanzada!</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 360 Feedback */}
+                <Card className="border-l-4 border-l-purple-500">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="w-5 h-5 text-purple-500" /> Feedback 360°
+                    </CardTitle>
+                    <CardDescription>
+                      Retroalimentación reciente de tu equipo y manager
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {feedbacks.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">Aún no has recibido feedback 360.</p>
+                      </div>
+                    ) : (
+                      feedbacks.slice(0, 3).map(fb => (
+                        <div key={fb.id} className="bg-muted/30 p-3 rounded-md text-sm">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-semibold capitalize text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
+                              {fb.relationship}
                             </span>
+                            <div className="flex">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className={`w-3 h-3 ${i < fb.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
+                              ))}
+                            </div>
                           </div>
-                          <div className="relative">
-                            <Progress value={result.percentage} className="h-3" />
-                            {gap > 0 && (
-                              <div
-                                className="absolute top-0 h-3 rounded-r-full bg-destructive/20"
-                                style={{
-                                  left: `${result.percentage}%`,
-                                  width: `${gap}%`,
-                                }}
-                              />
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Brecha: {gap} puntos • {result.correct}/{result.total} correctas
+                          <p className="italic text-muted-foreground">"{fb.content}"</p>
+                          <p className="text-[10px] text-right mt-1 opacity-50">
+                            {new Date(fb.created_at).toLocaleDateString()}
                           </p>
                         </div>
-                      );
-                    })}
-                </CardContent>
-              </Card>
+                      ))
+                    )}
+                    {feedbacks.length > 0 && (
+                      <Button variant="ghost" size="sm" className="w-full text-xs text-purple-600 hover:text-purple-700">
+                        Ver todo el historial
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Strategic Roadmap */}
+            {assessmentResults.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Target className="h-6 w-6 text-primary" />
+                  <h2 className="text-xl font-bold">Hoja de Ruta Estratégica</h2>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-6">
+                  {/* Phase 1 */}
+                  <Card className="border-l-4 border-l-destructive bg-secondary/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-bold text-destructive uppercase tracking-wide flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> FASE 1: Cimientos Críticos
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Prioridad Inmediata (0-3 Meses)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {phases[1].length === 0 && <p className="text-sm text-muted-foreground">¡Sin brechas críticas!</p>}
+                      {phases[1].map(item => (
+                        <RoadmapCard key={item.section} item={item} />
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Phase 2 */}
+                  <Card className="border-l-4 border-l-warning bg-secondary/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-bold text-warning uppercase tracking-wide flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" /> FASE 2: Expansión
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Crecimiento Estructural (3-6 Meses)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {phases[2].length === 0 && <p className="text-sm text-muted-foreground">...</p>}
+                      {phases[2].map(item => (
+                        <RoadmapCard key={item.section} item={item} />
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Phase 3 */}
+                  <Card className="border-l-4 border-l-primary bg-background">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-bold text-primary uppercase tracking-wide flex items-center gap-2">
+                        <Award className="w-4 h-4" /> FASE 3: Maestría
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Especialización Avanzada (+6 Meses)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {phases[3].length === 0 && <p className="text-sm text-muted-foreground">...</p>}
+                      {phases[3].map(item => (
+                        <RoadmapCard key={item.section} item={item} />
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             )}
 
             {assessmentResults.length === 0 && (
@@ -521,5 +919,7 @@ const LearningPath = () => {
     </>
   );
 };
+
+
 
 export default LearningPath;

@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Assessment from "./pages/Assessment";
 import Courses from "./pages/Courses";
 import Planning from "./pages/Planning";
+import Objectives from "./pages/Objectives";
 import LearningPath from "./pages/LearningPath";
 import Team from "./pages/Team";
 import Reports from "./pages/Reports";
@@ -58,6 +59,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Planning />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/objectives"
+              element={
+                <ProtectedRoute>
+                  <Objectives />
                 </ProtectedRoute>
               }
             />
