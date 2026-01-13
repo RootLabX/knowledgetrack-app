@@ -214,12 +214,18 @@ const Courses = () => {
 
       let fetchedCourses = data || [];
 
-      // Filter by department if not admin and user has department
-      if (!isAdmin && userDepartment) {
-        const userDeptId = departments.find(d => d.name === userDepartment)?.id;
-        if (userDeptId) {
-          fetchedCourses = fetchedCourses.filter((c: Course) => !c.department_id || c.department_id === userDeptId);
-        }
+      // Filter by department if not admin
+      if (!isAdmin) {
+        const userDeptId = userDepartment ? departments.find(d => d.name === userDepartment)?.id : null;
+
+        fetchedCourses = fetchedCourses.filter((c: Course) => {
+          // Always show global courses
+          if (!c.department_id) return true;
+          // Show department courses if user belongs to that department
+          if (userDeptId && c.department_id === userDeptId) return true;
+          // Otherwise hide
+          return false;
+        });
       }
 
       setCourses(fetchedCourses);
@@ -485,7 +491,7 @@ const Courses = () => {
           objectives: objectives.length > 0 ? objectives : null,
           start_date: courseForm.start_date || null,
           end_date: courseForm.end_date || null,
-          department_id: courseForm.department_id || null, // Added department_id
+          department_id: courseForm.department_id === "all" ? null : courseForm.department_id,
           // link: courseForm.link || null, // Assuming link field exists now? Wait, user requirement mentioned link. 
           // I need to check schema if 'link' exists on course. 
           // For now let's assume I need to add it or it might not be in DB yet.
@@ -533,9 +539,9 @@ const Courses = () => {
       difficulty: course.difficulty || "",
       objectives: course.objectives?.join("\n") || "",
       link: course.link || "",
-      start_date: course.start_date || "",
-      end_date: course.end_date || "",
-      department_id: course.department_id || "", // Set department_id for editing
+      start_date: course.start_date ? course.start_date.split('T')[0] : "",
+      end_date: course.end_date ? course.end_date.split('T')[0] : "",
+      department_id: course.department_id || "all", // Set department_id for editing, default to "all" if null
     });
     setEditDialogOpen(true);
   };
@@ -564,6 +570,7 @@ const Courses = () => {
           objectives: objectives.length > 0 ? objectives : null,
           start_date: courseForm.start_date || null,
           end_date: courseForm.end_date || null,
+          department_id: courseForm.department_id === "all" ? null : courseForm.department_id,
           // link: courseForm.link ... skipped as discussed
         })
         .eq("id", selectedCourse.id);
@@ -829,6 +836,26 @@ const Courses = () => {
                   rows={4}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="department">Departamento (Opcional)</Label>
+                <Select
+                  value={courseForm.department_id}
+                  onValueChange={(value) => setCourseForm({ ...courseForm, department_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos (General)</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setDialogOpen(false); resetCourseForm(); }}>
@@ -895,136 +922,138 @@ const Courses = () => {
         </Dialog>
       </div>
 
-      {courses.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <BookOpen className="mb-4 h-12 w-12 text-muted-foreground" />
-            <p className="text-lg font-medium text-foreground">No hay cursos disponibles</p>
-            <p className="text-sm text-muted-foreground">
-              Crea el primer curso para comenzar
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <Card key={course.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <Badge variant="outline" className="mb-2">
-                    {course.category}
-                  </Badge>
-                  {!course.is_active && (
-                    <Badge variant="secondary">Inactivo</Badge>
+      {
+        courses.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <BookOpen className="mb-4 h-12 w-12 text-muted-foreground" />
+              <p className="text-lg font-medium text-foreground">No hay cursos disponibles</p>
+              <p className="text-sm text-muted-foreground">
+                Crea el primer curso para comenzar
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {courses.map((course) => (
+              <Card key={course.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <Badge variant="outline" className="mb-2">
+                      {course.category}
+                    </Badge>
+                    {!course.is_active && (
+                      <Badge variant="secondary">Inactivo</Badge>
+                    )}
+                  </div>
+                  <CardTitle className="text-lg">{course.title}</CardTitle>
+                  {course.description && (
+                    <CardDescription className="line-clamp-2">
+                      {course.description}
+                    </CardDescription>
                   )}
-                </div>
-                <CardTitle className="text-lg">{course.title}</CardTitle>
-                {course.description && (
-                  <CardDescription className="line-clamp-2">
-                    {course.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="mt-auto space-y-4">
-                {/* Course Stats */}
+                </CardHeader>
+                <CardContent className="mt-auto space-y-4">
+                  {/* Course Stats */}
 
-                <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-                  <div
-                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted p-1 rounded transition-colors"
-                    onClick={() => handleOpenParticipantsDialog(course)}
-                  >
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      Participantes
-                    </span>
-                    <Badge variant="secondary" className="font-medium">
-                      Ver
+                  <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+                    <div
+                      className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted p-1 rounded transition-colors"
+                      onClick={() => handleOpenParticipantsDialog(course)}
+                    >
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        Participantes
+                      </span>
+                      <Badge variant="secondary" className="font-medium">
+                        Ver
+                      </Badge>
+                    </div>
+                    <div
+                      className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted p-1 rounded transition-colors"
+                      onClick={() => handleOpenCompletedDialog(course)}
+                    >
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <CheckCircle className="h-4 w-4" />
+                        Completados
+                      </span>
+                      <Badge variant="secondary" className="font-medium">
+                        Ver
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {course.duration_hours && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{course.duration_hours}h</span>
+                      </div>
+                    )}
+                    <Badge className={getDifficultyColor(course.difficulty)} variant="secondary">
+                      {getDifficultyLabel(course.difficulty)}
                     </Badge>
                   </div>
-                  <div
-                    className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted p-1 rounded transition-colors"
-                    onClick={() => handleOpenCompletedDialog(course)}
-                  >
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <CheckCircle className="h-4 w-4" />
-                      Completados
-                    </span>
-                    <Badge variant="secondary" className="font-medium">
-                      Ver
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {course.duration_hours && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{course.duration_hours}h</span>
+                  {course.objectives && course.objectives.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="flex items-center gap-1 text-sm font-medium text-foreground">
+                        <Target className="h-4 w-4" />
+                        Objetivos
+                      </p>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {course.objectives.slice(0, 3).map((obj, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                            <span className="line-clamp-1">{obj}</span>
+                          </li>
+                        ))}
+                        {course.objectives.length > 3 && (
+                          <li className="text-xs text-muted-foreground">
+                            +{course.objectives.length - 3} más
+                          </li>
+                        )}
+                      </ul>
                     </div>
                   )}
-                  <Badge className={getDifficultyColor(course.difficulty)} variant="secondary">
-                    {getDifficultyLabel(course.difficulty)}
-                  </Badge>
-                </div>
-                {course.objectives && course.objectives.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1 text-sm font-medium text-foreground">
-                      <Target className="h-4 w-4" />
-                      Objetivos
-                    </p>
-                    <ul className="space-y-1 text-sm text-muted-foreground">
-                      {course.objectives.slice(0, 3).map((obj, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
-                          <span className="line-clamp-1">{obj}</span>
-                        </li>
-                      ))}
-                      {course.objectives.length > 3 && (
-                        <li className="text-xs text-muted-foreground">
-                          +{course.objectives.length - 3} más
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`active-${course.id}`} className="text-sm text-muted-foreground cursor-pointer">
-                      {course.is_active ? "Activo" : "Inactivo"}
-                    </Label>
-                    <Switch
-                      id={`active-${course.id}`}
-                      checked={course.is_active}
-                      onCheckedChange={() => handleToggleActive(course)}
-                    />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`active-${course.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                        {course.is_active ? "Activo" : "Inactivo"}
+                      </Label>
+                      <Switch
+                        id={`active-${course.id}`}
+                        checked={course.is_active}
+                        onCheckedChange={() => handleToggleActive(course)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleOpenEditDialog(course)}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleOpenDeleteDialog(course)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleOpenEditDialog(course)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleOpenDeleteDialog(course)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
 
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      }
 
       {/* Assign Course Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
@@ -1101,6 +1130,25 @@ const Courses = () => {
                   {CATEGORIES.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-department">Departamento (Opcional)</Label>
+              <Select
+                value={courseForm.department_id}
+                onValueChange={(value) => setCourseForm({ ...courseForm, department_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un departamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos (General)</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1209,7 +1257,7 @@ const Courses = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   );
 };
 

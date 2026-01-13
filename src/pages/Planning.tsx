@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { usePlanning } from "@/hooks/usePlanning";
 import { CreatePlanningDialog } from "@/components/planning/CreatePlanningDialog";
@@ -39,34 +40,75 @@ const statusBadgeClasses: Record<string, string> = {
 const Planning = () => {
   const { objectives, progressMap, loading, createPlanning } = usePlanning();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
   const [departments, setDepartments] = useState<Department[]>([]);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      // Check Admin Role
+      const { data: { user } } = await supabase.auth.getUser();
+      let adminRole = false;
+      if (user) {
+        const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
+        adminRole = !!data;
+        setIsAdmin(adminRole);
+      }
+
       // Fetch Departments
       const { data: depts } = await supabase.from("departments").select("id, name");
-      if (depts) setDepartments(depts);
+      let currentDepts: Department[] = [];
+      if (depts) {
+        setDepartments(depts);
+        currentDepts = depts;
+      }
 
       // Fetch User Profile
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("department")
           .eq("id", user.id)
           .single();
-        if (profile) setUserDepartment(profile.department);
+
+        if (profile?.department) {
+          setUserDepartment(profile.department);
+
+          // Auto-select user's department for filter
+          const userDeptId = currentDepts.find(d => d.name === profile.department)?.id;
+          if (userDeptId) {
+            setSelectedDeptFilter(userDeptId);
+          }
+        }
       }
     };
     fetchData();
   }, []);
 
   const getFilteredObjectives = () => {
-    if (!userDepartment) return objectives;
-    const dept = departments.find(d => d.name === userDepartment);
-    if (!dept) return objectives;
-    return objectives.filter(obj => !obj.department_id || obj.department_id === dept.id);
+    let filtered = objectives;
+
+    // Strict Filtering for Non-Admins
+    if (!isAdmin) {
+      const userDeptId = userDepartment ? departments.find(d => d.name === userDepartment)?.id : null;
+      filtered = filtered.filter(obj => {
+        if (!obj.department_id) return true; // Global
+        if (userDeptId && obj.department_id === userDeptId) return true; // User Dept
+        return false;
+      });
+    }
+
+    // UI Filter
+    if (selectedDeptFilter !== 'all') {
+      if (selectedDeptFilter === 'global') {
+        filtered = filtered.filter(obj => !obj.department_id);
+      } else {
+        filtered = filtered.filter(obj => obj.department_id === selectedDeptFilter);
+      }
+    }
+
+    return filtered;
   };
 
   const filteredObjectives = getFilteredObjectives();
@@ -95,7 +137,23 @@ const Planning = () => {
           </div>
         </div>
 
-        <CreatePlanningDialog onCreate={createPlanning} departments={departments} />
+        <div className="flex items-center gap-2">
+          <div className="w-[200px]">
+            <Select value={selectedDeptFilter} onValueChange={setSelectedDeptFilter}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Filtrar por depto..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los Deptos</SelectItem>
+                <SelectItem value="global">🏢 Global (Sin Depto)</SelectItem>
+                {departments.map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <CreatePlanningDialog onCreate={createPlanning} departments={departments} />
+        </div>
       </div>
 
       {/* Content Grid */}

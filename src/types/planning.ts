@@ -2,7 +2,11 @@ export interface PlanningObjective {
   id: string;
   title: string;
   description?: string;
-  // Agrega otros campos según tu DB
+  start_date?: string;
+  end_date?: string;
+  status: string;
+  department_id?: string;
+  created_at?: string;
 }
 
 export interface PlanningListResponse {
