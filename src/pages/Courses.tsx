@@ -339,6 +339,23 @@ const Courses = () => {
     }
   };
 
+  const fetchAssignedUserIds = async (courseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .schema("mapper")
+        .from("user_courses")
+        .select("user_id")
+        .eq("course_id", courseId);
+
+      if (error) throw error;
+      const ids = (data || []).map((uc: any) => uc.user_id);
+      setSelectedUsers(ids);
+    } catch (error) {
+      console.error("Error fetching assigned users:", error);
+      toast.error("Error al cargar asignaciones");
+    }
+  };
+
   const handleUpdateProgress = async (courseId: string, newProgress: number) => {
     if (!currentUser) return;
 
@@ -453,6 +470,7 @@ const Courses = () => {
   };
 
   const resetCourseForm = () => {
+    setSelectedUsers([]);
     setCourseForm({
       title: "",
       description: "",
@@ -479,7 +497,7 @@ const Courses = () => {
         .map((o) => o.trim())
         .filter((o) => o.length > 0);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .schema("mapper")
         .from("courses")
         .insert({
@@ -492,31 +510,28 @@ const Courses = () => {
           start_date: courseForm.start_date || null,
           end_date: courseForm.end_date || null,
           department_id: courseForm.department_id === "all" ? null : courseForm.department_id,
-          // link: courseForm.link || null, // Assuming link field exists now? Wait, user requirement mentioned link. 
-          // I need to check schema if 'link' exists on course. 
-          // For now let's assume I need to add it or it might not be in DB yet.
-          // Wait, 'link' was requested in the card. It's likely NOT in the DB yet based on previous `types.ts` view.
-          // I cannot add "link" to insert without migration.
-          // However, for the purpose of the UI "requirement", maybe I should just add a placeholder or asked user?
-          // I'll stick to what I can do. I can't modify schema without SQL.
-          // The user said "Quiero que el card tenga... Link del curso".
-          // If I can't store it, I can't show it from DB.
-          // I will proceed without saving link for now, or just leave the UI ready for it. 
-          // Re-reading request: "En la sección de cursos para usuarios con role employee necesito que modificar el diseño... Link del curso"
-          // This implies the data exists or should exist. 
-          // I'll add the UI field but maybe won't save it effectively if DB rejects it.
-          // Better yet, I'll allow the UI to try, if it errors I'll know.
-          // Actually, I should probably search if there is a link field I missed. 
-          // Types said no. 
-          // I will ignore 'link' in saving to avoid 100% error. 
-          // But wait, the user wants me to display it. 
-          // I will assume for now I can't display a link that doesn't exist.
-          // I will comment it out or put a dummy if needed? No, better to just omit "link" in INSERT for now to avoid crash.
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error("Supabase error creating course:", error);
         throw error;
+      }
+
+      // Assign users if any selected
+      if (selectedUsers.length > 0 && data) {
+        const assignments = selectedUsers.map((userId) => ({
+          course_id: data.id,
+          user_id: userId,
+          status: "assigned",
+        }));
+
+        const { error: assignError } = await supabase.schema("mapper").from("user_courses").insert(assignments);
+        if (assignError) {
+          console.error("Error creating assignments:", assignError);
+          toast.error("Curso creado, pero hubo error al asignar usuarios");
+        }
       }
 
       toast.success("Curso creado correctamente");
@@ -543,6 +558,7 @@ const Courses = () => {
       end_date: course.end_date ? course.end_date.split('T')[0] : "",
       department_id: course.department_id || "all", // Set department_id for editing, default to "all" if null
     });
+    fetchAssignedUserIds(course.id);
     setEditDialogOpen(true);
   };
 
@@ -577,11 +593,41 @@ const Courses = () => {
 
       if (error) throw error;
 
+      // Handle user assignments
+      const { data: currentAssignments, error: fetchError } = await supabase
+        .schema("mapper")
+        .from("user_courses")
+        .select("user_id")
+        .eq("course_id", selectedCourse.id);
+
+      if (fetchError) throw fetchError;
+
+      const currentlyAssignedUserIds = currentAssignments.map(a => a.user_id);
+
+      const usersToAdd = selectedUsers.filter(userId => !currentlyAssignedUserIds.includes(userId));
+      const usersToRemove = currentlyAssignedUserIds.filter(userId => !selectedUsers.includes(userId));
+
+      if (usersToAdd.length > 0) {
+        const addAssignments = usersToAdd.map(userId => ({
+          course_id: selectedCourse.id,
+          user_id: userId,
+          status: "assigned",
+        }));
+        const { error: addError } = await supabase.schema("mapper").from("user_courses").insert(addAssignments);
+        if (addError) console.error("Error adding assignments:", addError);
+      }
+
+      if (usersToRemove.length > 0) {
+        const { error: removeError } = await supabase.schema("mapper").from("user_courses").delete().eq("course_id", selectedCourse.id).in("user_id", usersToRemove);
+        if (removeError) console.error("Error removing assignments:", removeError);
+      }
+
       toast.success("Curso actualizado correctamente");
       setEditDialogOpen(false);
       setSelectedCourse(null);
       resetCourseForm();
       fetchCourses();
+      fetchCourseStats(); // Refresh stats after assignment changes
     } catch (error) {
       console.error("Error updating course:", error);
       toast.error("Error al actualizar el curso");
@@ -805,6 +851,27 @@ const Courses = () => {
                     value={courseForm.end_date}
                     onChange={(e) => setCourseForm({ ...courseForm, end_date: e.target.value })}
                   />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Participantes</Label>
+                <div className="border rounded-md max-h-48 overflow-y-auto p-2">
+                  {profiles.map((profile) => (
+                    <div
+                      key={profile.id}
+                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
+                      onClick={() => toggleUserSelection(profile.user_id || profile.id)}
+                    >
+                      <Checkbox
+                        checked={selectedUsers.includes(profile.user_id || profile.id)}
+                        onCheckedChange={() => toggleUserSelection(profile.user_id || profile.id)}
+                      />
+                      <span className="text-sm">
+                        {profile.full_name || "Usuario sin nombre"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="space-y-2">
@@ -1204,6 +1271,27 @@ const Courses = () => {
                   value={courseForm.end_date}
                   onChange={(e) => setCourseForm({ ...courseForm, end_date: e.target.value })}
                 />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Participantes</Label>
+              <div className="border rounded-md max-h-48 overflow-y-auto p-2">
+                {profiles.map((profile) => (
+                  <div
+                    key={profile.id}
+                    className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
+                    onClick={() => toggleUserSelection(profile.user_id || profile.id)}
+                  >
+                    <Checkbox
+                      checked={selectedUsers.includes(profile.user_id || profile.id)}
+                      onCheckedChange={() => toggleUserSelection(profile.user_id || profile.id)}
+                    />
+                    <span className="text-sm">
+                      {profile.full_name || "Usuario sin nombre"}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="space-y-2">
