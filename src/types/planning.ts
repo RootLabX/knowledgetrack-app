@@ -7,6 +7,9 @@ export interface PlanningObjective {
   status: string;
   department_id?: string;
   created_at?: string;
+  planning_sprints?: {
+    planning_tasks?: { status: string }[];
+  }[];
 }
 
 export interface PlanningListResponse {

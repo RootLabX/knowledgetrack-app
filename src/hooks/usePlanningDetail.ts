@@ -13,6 +13,7 @@ export interface PlanningSprint {
   status: string;
   created_at?: string;
   created_by?: string | null;
+  planning_tasks?: { status: string; points?: number }[]; // Minimal fields needed
 }
 
 // 2. Actualizamos la interfaz del Objetivo (Padre) para incluir los sprints
@@ -46,7 +47,11 @@ export const usePlanningDetail = (planId?: string) => {
         .from("planning_objectives")
         .select(`
           *,
-          planning_sprints (*)
+          *,
+          planning_sprints (
+            *,
+            planning_tasks (status, points)
+          )
         `)
         .eq("id", planId) // Aquí usamos la variable planId que viene de los argumentos
         .single();
@@ -60,11 +65,11 @@ export const usePlanningDetail = (planId?: string) => {
 
       // Convertimos los datos para asegurar que coincidan con la interfaz
       // (A veces Supabase devuelve null en arrays vacíos, esto lo asegura)
-      const formattedData: PlanningObjective = {
+      const formattedData = {
         ...data,
-        planning_sprints: data.planning_sprints || []
-      };
-
+        planning_sprints: (data.planning_sprints as unknown as PlanningSprint[]) || []
+      } as unknown as PlanningObjective;
+      
       setPlan(formattedData);
     } catch (err) {
       console.error("Error inesperado:", err);

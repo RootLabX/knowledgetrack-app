@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import type { PlanningObjective } from "@/types/planning";
-import { fetchPlanningList, createPlanning } from "@/lib/planningApi";
+import { fetchPlanningList, createPlanning, updatePlanning, deletePlanning } from "@/lib/planningApi";
 import { toast } from "sonner";
 
 export function usePlanning() {
@@ -32,6 +32,7 @@ export function usePlanning() {
       description?: string | null;
       start_date?: string | null;
       end_date?: string | null;
+      department_id?: string | null;
     }) => {
       try {
         const planning = await createPlanning({
@@ -53,11 +54,47 @@ export function usePlanning() {
     []
   );
 
+  const handleUpdatePlanning = useCallback(
+    async (id: string, payload: Partial<PlanningObjective>) => {
+      try {
+        const updated = await updatePlanning(id, payload);
+        
+        setObjectives((prev) => 
+          prev.map((obj) => (obj.id === id ? updated : obj))
+        );
+        toast.success("Planificación actualizada correctamente");
+      } catch (error) {
+        console.error("Error updating planning:", error);
+        toast.error("Error al actualizar la planificación");
+        throw error;
+      }
+    },
+    []
+  );
+
+  const handleDeletePlanning = useCallback(
+    async (id: string) => {
+      try {
+        await deletePlanning(id);
+        
+        setObjectives((prev) => prev.filter((obj) => obj.id !== id));
+        toast.success("Planificación eliminada correctamente");
+      } catch (error) {
+        console.error("Error deleting planning:", error);
+        toast.error("Error al eliminar la planificación");
+        throw error;
+      }
+    },
+    []
+  );
+
   return {
     objectives,
     progressMap,
     loading,
     reload: loadData,
     createPlanning: handleCreatePlanning,
+    updatePlanning: handleUpdatePlanning,
+    deletePlanning: handleDeletePlanning,
   };
 }

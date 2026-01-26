@@ -21,6 +21,16 @@ interface Department {
 
 interface CreatePlanningDialogProps {
   departments?: Department[];
+  mode?: "create" | "edit";
+  initialData?: {
+    id?: string;
+    title: string;
+    description?: string;
+    start_date?: string;
+    end_date?: string;
+    department_id?: string;
+  };
+  trigger?: React.ReactNode;
   onCreate: (data: {
     title: string;
     description?: string | null;
@@ -30,15 +40,15 @@ interface CreatePlanningDialogProps {
   }) => Promise<void> | void;
 }
 
-export function CreatePlanningDialog({ onCreate, departments = [] }: CreatePlanningDialogProps) {
+export function CreatePlanningDialog({ onCreate, departments = [], mode = "create", initialData, trigger }: CreatePlanningDialogProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
+  const [title, setTitle] = useState(initialData?.title || "");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [startDate, setStartDate] = useState(initialData?.start_date || "");
+  const [endDate, setEndDate] = useState(initialData?.end_date || "");
+  const [departmentId, setDepartmentId] = useState(initialData?.department_id || "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,18 +77,20 @@ export function CreatePlanningDialog({ onCreate, departments = [] }: CreatePlann
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          className="bg-primary hover:bg-primary/90 text-white shadow-sm"
-          id="newPlanningBtn"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Planificación
-        </Button>
+        {trigger ? trigger : (
+          <Button
+            className="bg-primary hover:bg-primary/90 text-white shadow-sm"
+            id="newPlanningBtn"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Planificación
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Nueva planificación</DialogTitle>
+            <DialogTitle>{mode === "create" ? "Nueva planificación" : "Editar planificación"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -141,7 +153,7 @@ export function CreatePlanningDialog({ onCreate, departments = [] }: CreatePlann
 
           <DialogFooter>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Creando..." : "Crear planificación"}
+              {submitting ? "Guardando..." : (mode === "create" ? "Crear planificación" : "Guardar cambios")}
             </Button>
           </DialogFooter>
         </form>

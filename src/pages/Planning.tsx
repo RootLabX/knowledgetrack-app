@@ -37,13 +37,39 @@ const statusBadgeClasses: Record<string, string> = {
   completed: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100",
 };
 
+import Swal from "sweetalert2";
+
 const Planning = () => {
-  const { objectives, progressMap, loading, createPlanning } = usePlanning();
+  const { objectives, progressMap, loading, createPlanning, updatePlanning, deletePlanning } = usePlanning();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
   const [departments, setDepartments] = useState<Department[]>([]);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: "Esta acción no se puede deshacer.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      await deletePlanning(id);
+      Swal.fire(
+        '¡Eliminado!',
+        'La planificación ha sido eliminada.',
+        'success'
+      );
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -173,11 +199,32 @@ const Planning = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="planningGrid">
           {filteredObjectives.map((objective) => {
-            const statusKey = objective.status ?? "in_progress";
+            // Lógica de estado dinámico
+            const getComputedStatus = () => {
+              const allTasks = objective.planning_sprints?.flatMap(s => s.planning_tasks || []) || [];
+
+              if (allTasks.length === 0) return "planned";
+              const allDone = allTasks.every(t => t.status === 'done');
+              if (allDone) return "completed";
+              const allTodo = allTasks.every(t => t.status === 'todo');
+              if (allTodo) return "planned";
+
+              return "in_progress";
+            };
+
+            const getComputedProgress = () => {
+              const allTasks = objective.planning_sprints?.flatMap(s => s.planning_tasks || []) || [];
+              const totalTasks = allTasks.length;
+              if (totalTasks === 0) return 0;
+              const completedTasks = allTasks.filter(t => t.status === 'done').length;
+              return Math.round((completedTasks / totalTasks) * 100);
+            };
+
+            const statusKey = getComputedStatus();
             const statusLabel = statusLabelMap[statusKey] ?? "En progreso";
             const statusClasses =
               statusBadgeClasses[statusKey] ?? statusBadgeClasses["in_progress"];
-            const progress = progressMap[objective.id] ?? 0;
+            const progress = getComputedProgress();
 
             return (
               <Card
@@ -208,7 +255,6 @@ const Planning = () => {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-gray-400 hover:text-gray-600"
-                          // para que el menú no dispare el onClick del Card
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="h-4 w-4" />
@@ -216,11 +262,35 @@ const Planning = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        // idem: evitar que el click en el menú navegue
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
+                        {/* Usamos un Dialog separado o un estado global para editar. 
+                               Para simplicidad, usaremos el Dialog aquí mismo pasando el trigger.
+                               Pero el Dialog dentro de un DropdownMenu puede ser problemático.
+                               Mejor abrimos el Dialog desde aquí controlando el estado open.
+                           */}
+                        <CreatePlanningDialog
+                          mode="edit"
+                          initialData={{
+                            id: objective.id,
+                            title: objective.title,
+                            description: objective.description || undefined,
+                            start_date: objective.start_date || undefined,
+                            end_date: objective.end_date || undefined,
+                            department_id: objective.department_id || undefined,
+                          }}
+                          onCreate={(data) => updatePlanning(objective.id, data)}
+                          departments={departments}
+                          trigger={
+                            <div className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
+                              Editar
+                            </div>
+                          }
+                        />
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600"
+                          onClick={(e) => handleDelete(objective.id, e)}
+                        >
                           Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>

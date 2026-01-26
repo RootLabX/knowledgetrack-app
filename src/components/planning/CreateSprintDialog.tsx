@@ -14,6 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
 
 interface CreateSprintDialogProps {
+  mode?: "create" | "edit";
+  initialData?: {
+    id?: string;
+    title: string;
+    goal?: string;
+    start_date?: string;
+    end_date?: string;
+  };
   onCreate: (data: {
     title: string;
     goal?: string | null;
@@ -21,21 +29,25 @@ interface CreateSprintDialogProps {
     end_date?: string | null;
   }) => Promise<void> | void;
   triggerLabel?: string;
+  trigger?: React.ReactNode;
   variant?: "default" | "outline" | "ghost";
 }
 
-export function CreateSprintDialog({ 
-  onCreate, 
-  triggerLabel = "Nuevo Sprint", 
-  variant = "default" 
+export function CreateSprintDialog({
+  mode = "create",
+  initialData,
+  onCreate,
+  triggerLabel = "Nuevo Sprint",
+  trigger,
+  variant = "default"
 }: CreateSprintDialogProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [title, setTitle] = useState("");
-  const [goal, setGoal] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [title, setTitle] = useState(initialData?.title || "");
+  const [goal, setGoal] = useState(initialData?.goal || "");
+  const [startDate, setStartDate] = useState(initialData?.start_date?.split('T')[0] || "");
+  const [endDate, setEndDate] = useState(initialData?.end_date?.split('T')[0] || "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,11 +62,13 @@ export function CreateSprintDialog({
         end_date: endDate || null,
       });
       setOpen(false);
-      // Resetear formulario
-      setTitle("");
-      setGoal("");
-      setStartDate("");
-      setEndDate("");
+      if (mode === 'create') {
+        // Resetear formulario solo si es creación
+        setTitle("");
+        setGoal("");
+        setStartDate("");
+        setEndDate("");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -63,18 +77,20 @@ export function CreateSprintDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant={variant}
-          className={variant === 'default' ? "bg-primary hover:bg-primary/90 text-white shadow-sm" : ""}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          {triggerLabel}
-        </Button>
+        {trigger ? trigger : (
+          <Button
+            variant={variant}
+            className={variant === 'default' ? "bg-primary hover:bg-primary/90 text-white shadow-sm" : ""}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {triggerLabel}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Nuevo Sprint</DialogTitle>
+            <DialogTitle>{mode === "create" ? "Nuevo Sprint" : "Editar Sprint"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -124,7 +140,7 @@ export function CreateSprintDialog({
 
           <DialogFooter>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Creando..." : "Crear Sprint"}
+              {submitting ? "Guardando..." : (mode === "create" ? "Crear Sprint" : "Guardar Cambios")}
             </Button>
           </DialogFooter>
         </form>
