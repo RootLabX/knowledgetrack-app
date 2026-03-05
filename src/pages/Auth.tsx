@@ -67,8 +67,7 @@ const Auth = () => {
           <Button
             onClick={handleMicrosoftLogin}
             disabled={submitting}
-            variant="outline"
-            className="w-full h-12 text-base font-medium rounded-full border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 gap-3"
+            className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#0EA5E9] hover:opacity-90 text-white shadow-md border-0 h-12 text-base font-medium rounded-full gap-3"
           >
             <MicrosoftIcon />
             {submitting ? "Redirigiendo..." : "Iniciar sesión con Microsoft"}
