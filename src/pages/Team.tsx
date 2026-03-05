@@ -27,7 +27,6 @@ import { toast } from "sonner";
 
 interface TeamMember {
   id: string;
-  user_id: string;
   full_name: string | null;
   department: string | null;
   position: string | null;
@@ -73,7 +72,7 @@ const Team = () => {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name, department, position");
+        .select("id, full_name, department, position");
 
       if (profilesError) throw profilesError;
 
@@ -93,12 +92,11 @@ const Team = () => {
       if (userCoursesError) throw userCoursesError;
 
       const members: TeamMember[] = profiles.map((profile) => {
-        const userRole = roles?.find((r) => r.user_id === profile.user_id);
-        const userCoursesData = userCourses?.filter((c) => c.user_id === profile.user_id) || [];
+        const userRole = roles?.find((r) => r.user_id === profile.id);
+        const userCoursesData = userCourses?.filter((c) => c.user_id === profile.id) || [];
 
         return {
           id: profile.id,
-          user_id: profile.user_id,
           full_name: profile.full_name,
           department: profile.department,
           position: profile.position,
@@ -134,7 +132,7 @@ const Team = () => {
         .schema("mapper")
         .from("user_courses")
         .insert({
-          user_id: selectedMember.user_id,
+          user_id: selectedMember.id,
           course_id: selectedCourse,
           status: 'assigned',
           progress: 0,

@@ -165,7 +165,7 @@ const Assessment = () => {
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("is_assessment_enabled")
-          .eq("user_id", user.id)
+          .eq("id", user.id)
           .single();
 
         if (!profileError && profileData) {

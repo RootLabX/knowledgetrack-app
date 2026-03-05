@@ -35,7 +35,6 @@ import { toast } from "sonner";
 
 interface TeamMemberDetail {
   id: string;
-  user_id: string;
   full_name: string | null;
   department: string | null;
   position: string | null;
@@ -186,9 +185,9 @@ const AdminDashboard = () => {
 
       // Build team member details
       const teamMembers: TeamMemberDetail[] = (profiles || []).map((profile) => {
-        const memberCourses = (userCourses || []).filter((c) => c.user_id === profile.user_id);
+        const memberCourses = (userCourses || []).filter((c) => c.user_id === profile.id);
         const memberAssessment = (assessments || []).find(
-          (a) => a.user_id === profile.user_id && a.status === "completed"
+          (a) => a.user_id === profile.id && a.status === "completed"
         );
 
         // Parse results to find knowledge gaps
@@ -203,7 +202,6 @@ const AdminDashboard = () => {
 
         return {
           id: profile.id,
-          user_id: profile.user_id,
           full_name: profile.full_name,
           department: profile.department,
           position: profile.position,

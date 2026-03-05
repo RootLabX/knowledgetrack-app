@@ -861,11 +861,11 @@ const Courses = () => {
                     <div
                       key={profile.id}
                       className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                      onClick={() => toggleUserSelection(profile.user_id || profile.id)}
+                      onClick={() => toggleUserSelection(profile.id)}
                     >
                       <Checkbox
-                        checked={selectedUsers.includes(profile.user_id || profile.id)}
-                        onCheckedChange={() => toggleUserSelection(profile.user_id || profile.id)}
+                        checked={selectedUsers.includes(profile.id)}
+                        onCheckedChange={() => toggleUserSelection(profile.id)}
                       />
                       <span className="text-sm">
                         {profile.full_name || "Usuario sin nombre"}
@@ -1141,11 +1141,11 @@ const Courses = () => {
                 <div
                   key={profile.id}
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                  onClick={() => toggleUserSelection(profile.user_id)}
+                  onClick={() => toggleUserSelection(profile.id)}
                 >
                   <Checkbox
-                    checked={selectedUsers.includes(profile.user_id)}
-                    onCheckedChange={() => toggleUserSelection(profile.user_id)}
+                    checked={selectedUsers.includes(profile.id)}
+                    onCheckedChange={() => toggleUserSelection(profile.id)}
                   />
                   <span className="text-sm">
                     {profile.full_name || "Usuario sin nombre"}
@@ -1281,11 +1281,11 @@ const Courses = () => {
                   <div
                     key={profile.id}
                     className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                    onClick={() => toggleUserSelection(profile.user_id || profile.id)}
+                    onClick={() => toggleUserSelection(profile.id)}
                   >
                     <Checkbox
-                      checked={selectedUsers.includes(profile.user_id || profile.id)}
-                      onCheckedChange={() => toggleUserSelection(profile.user_id || profile.id)}
+                      checked={selectedUsers.includes(profile.id)}
+                      onCheckedChange={() => toggleUserSelection(profile.id)}
                     />
                     <span className="text-sm">
                       {profile.full_name || "Usuario sin nombre"}

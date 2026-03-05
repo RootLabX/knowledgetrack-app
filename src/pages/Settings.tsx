@@ -33,7 +33,7 @@ const Settings = () => {
       const { data: profileData } = await supabase
         .from("profiles")
         .select("full_name, department, position")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .single();
 
       if (profileData) {
@@ -44,14 +44,23 @@ const Settings = () => {
         });
       }
 
-      const { data: roleData } = await supabase
+      const { data: adminCheck } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .single();
+        .eq("role", "admin")
+        .maybeSingle();
 
-      if (roleData) {
-        setRole(roleData.role);
+      if (adminCheck) {
+        setRole("admin");
+      } else {
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        if (roleData) setRole(roleData.role);
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -70,7 +79,7 @@ const Settings = () => {
           department: profile.department,
           position: profile.position,
         })
-        .eq("user_id", user.id);
+        .eq("id", user.id);
 
       if (error) throw error;
 
