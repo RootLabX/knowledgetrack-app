@@ -48,17 +48,17 @@ const Reports = () => {
 
       // Fetch courses
       const { data: courses, error: coursesError } = await supabase
+        .schema("mapper")
         .from("courses")
-        .select("*")
-        .schema("mapper");
+        .select("*");
 
       if (coursesError) throw coursesError;
 
       // Fetch user courses (assignments)
       const { data: userCourses, error: userCoursesError } = await supabase
+        .schema("mapper")
         .from("user_courses")
-        .select("*")
-        .schema("mapper");
+        .select("*");
 
       if (userCoursesError) throw userCoursesError;
 

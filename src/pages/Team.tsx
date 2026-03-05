@@ -20,7 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Plus, UserPlus, Users } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { BookOpen, Brain, Plus, UserPlus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ interface TeamMember {
   role: string;
   courses_assigned: number;
   courses_completed: number;
+  is_assessment_enabled: boolean;
 }
 
 interface Course {
@@ -72,7 +74,7 @@ const Team = () => {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("id, full_name, department, position");
+        .select("id, full_name, department, position, is_assessment_enabled");
 
       if (profilesError) throw profilesError;
 
@@ -103,6 +105,7 @@ const Team = () => {
           role: userRole?.role || "user",
           courses_assigned: userCoursesData.length,
           courses_completed: userCoursesData.filter((c) => c.status === "completed").length,
+          is_assessment_enabled: profile.is_assessment_enabled || false,
         };
       });
 
@@ -152,6 +155,27 @@ const Team = () => {
         console.error("Error assigning course:", error);
         toast.error("Error al asignar el curso");
       }
+    }
+  };
+
+  const toggleAssessment = async (memberId: string, currentValue: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_assessment_enabled: !currentValue })
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      setTeamMembers((prev) =>
+        prev.map((m) =>
+          m.id === memberId ? { ...m, is_assessment_enabled: !currentValue } : m
+        )
+      );
+      toast.success(!currentValue ? "Evaluación habilitada" : "Evaluación deshabilitada");
+    } catch (error) {
+      console.error("Error toggling assessment:", error);
+      toast.error("Error al cambiar el estado de la evaluación");
     }
   };
 
@@ -284,6 +308,15 @@ const Team = () => {
                         className="mt-1 h-2"
                       />
                     </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2" title={member.is_assessment_enabled ? "Evaluación habilitada" : "Evaluación deshabilitada"}>
+                        <Brain className="h-4 w-4 text-muted-foreground" />
+                        <Switch
+                          checked={member.is_assessment_enabled}
+                          onCheckedChange={() => toggleAssessment(member.id, member.is_assessment_enabled)}
+                        />
+                      </div>
+                    )}
                     {isAdmin && (
                       <Dialog open={assignDialogOpen && selectedMember?.id === member.id} onOpenChange={(open) => {
                         setAssignDialogOpen(open);
