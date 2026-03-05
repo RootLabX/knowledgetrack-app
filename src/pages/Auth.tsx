@@ -3,17 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { LogIn } from "lucide-react";
+
+const MicrosoftIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+    <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+    <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+    <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+  </svg>
+);
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, signIn } = useAuth();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { user, loading, signInWithMicrosoft } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -30,15 +33,12 @@ const Auth = () => {
     );
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMicrosoftLogin = async () => {
     setSubmitting(true);
     try {
-      const { error } = await signIn(email, password);
-      if (error) throw error;
+      await signInWithMicrosoft();
     } catch (error: any) {
-      toast.error(error.message || "Error al iniciar sesión");
-    } finally {
+      toast.error(error.message || "Error al iniciar sesión con Microsoft");
       setSubmitting(false);
     }
   };
@@ -47,7 +47,6 @@ const Auth = () => {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#F1F5F9] p-4">
       <Card className="w-full max-w-md border-none shadow-lg">
         <CardContent className="flex flex-col items-center pt-10 pb-10 px-8 text-center">
-          {/* Logo */}
           <div className="mb-8 w-full max-w-[280px]">
             <img
               src="/images/pandatech-logo-BxiF7NRv.png"
@@ -56,7 +55,6 @@ const Auth = () => {
             />
           </div>
 
-          {/* Titles */}
           <div className="space-y-2 mb-8">
             <h1 className="text-[#0ea5e9] text-2xl font-bold tracking-tight">
               PANDATECH SkillsPath
@@ -66,43 +64,18 @@ const Auth = () => {
             </p>
           </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleLogin} className="w-full space-y-4 mb-6">
-            <div className="space-y-2 text-left">
-              <Label htmlFor="email">Correo electrónico</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@empresa.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2 text-left">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#0EA5E9] hover:opacity-90 text-white shadow-md border-0 h-11 text-base font-medium rounded-full"
-            >
-              <LogIn className="mr-2 h-5 w-5" />
-              {submitting ? "Iniciando sesión..." : "Iniciar sesión"}
-            </Button>
-          </form>
+          <Button
+            onClick={handleMicrosoftLogin}
+            disabled={submitting}
+            variant="outline"
+            className="w-full h-12 text-base font-medium rounded-full border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 gap-3"
+          >
+            <MicrosoftIcon />
+            {submitting ? "Redirigiendo..." : "Iniciar sesión con Microsoft"}
+          </Button>
 
-          {/* Footer Text */}
-          <p className="text-xs text-muted-foreground text-center px-4 leading-relaxed">
-            El registro de nuevos usuarios solo puede ser realizado por un administrador.
+          <p className="mt-6 text-xs text-muted-foreground text-center px-4 leading-relaxed">
+            Usa tu cuenta corporativa de Microsoft para acceder.
           </p>
         </CardContent>
       </Card>

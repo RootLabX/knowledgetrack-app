@@ -6,8 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithMicrosoft: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -38,24 +37,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
-  };
-
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
+  const signInWithMicrosoft = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "azure",
       options: {
-        emailRedirectTo: redirectUrl,
+        redirectTo: `${window.location.origin}/`,
+        scopes: "email profile openid",
       },
     });
-    return { error: error as Error | null };
+    if (error) throw error;
   };
 
   const signOut = async () => {
@@ -68,8 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         session,
         loading,
-        signIn,
-        signUp,
+        signInWithMicrosoft,
         signOut,
       }}
     >
