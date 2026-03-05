@@ -52,6 +52,7 @@ const Team = () => {
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
 
   useEffect(() => {
     fetchTeamData();
@@ -179,6 +180,14 @@ const Team = () => {
     }
   };
 
+  const departments = Array.from(
+    new Set(teamMembers.map((m) => m.department).filter(Boolean))
+  ).sort() as string[];
+
+  const filteredMembers = departmentFilter === "all"
+    ? teamMembers
+    : teamMembers.filter((m) => m.department === departmentFilter);
+
   const getInitials = (name: string | null) => {
     if (!name) return "U";
     return name
@@ -253,22 +262,41 @@ const Team = () => {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Miembros del Equipo</CardTitle>
-          <CardDescription>Lista de todos los miembros y su progreso</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Miembros del Equipo</CardTitle>
+            <CardDescription className="mt-1">Lista de todos los miembros y su progreso</CardDescription>
+          </div>
+          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Filtrar por departamento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los departamentos</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept} value={dept}>
+                  {dept}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
-          {teamMembers.length === 0 ? (
+          {filteredMembers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Users className="mb-4 h-12 w-12 text-muted-foreground" />
-              <p className="text-sm font-medium text-foreground">No hay miembros en el equipo</p>
+              <p className="text-sm font-medium text-foreground">
+                {departmentFilter === "all" ? "No hay miembros en el equipo" : "No hay miembros en este departamento"}
+              </p>
               <p className="text-sm text-muted-foreground">
-                Los usuarios aparecerán aquí cuando se registren
+                {departmentFilter === "all"
+                  ? "Los usuarios aparecerán aquí cuando se registren"
+                  : "Prueba con otro departamento"}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {teamMembers.map((member) => (
+              {filteredMembers.map((member) => (
                 <div
                   key={member.id}
                   className="flex items-center justify-between rounded-lg border p-4"
