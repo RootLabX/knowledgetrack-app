@@ -156,12 +156,44 @@ const Assessment = () => {
 
   const [canTakeAssessment, setCanTakeAssessment] = useState(false);
   const [loadingPermissions, setLoadingPermissions] = useState(true);
+  const [hasSavedProgress, setHasSavedProgress] = useState(false);
+
+  const STORAGE_KEY = `assessment_progress_${user?.id}`;
+
+  const saveProgress = (
+    id: string,
+    questionIdx: number,
+    currentAnswers: Record<number, number>
+  ) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ assessmentId: id, currentQuestion: questionIdx, answers: currentAnswers })
+    );
+  };
+
+  const clearProgress = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setHasSavedProgress(false);
+  };
+
+  const loadSavedProgress = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as {
+        assessmentId: string;
+        currentQuestion: number;
+        answers: Record<number, number>;
+      };
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
       try {
-        // Fetch permissions
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("is_assessment_enabled")
@@ -172,7 +204,6 @@ const Assessment = () => {
           setCanTakeAssessment(profileData.is_assessment_enabled || false);
         }
 
-        // Fetch existing assessment
         const { data, error } = await supabase
           .schema("mapper")
           .from("assessments")
@@ -185,6 +216,9 @@ const Assessment = () => {
 
         if (error) throw error;
         if (data) setExistingAssessment(data);
+
+        const saved = loadSavedProgress();
+        setHasSavedProgress(!!saved);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -196,20 +230,37 @@ const Assessment = () => {
   }, [user]);
 
   const startNewAssessment = () => {
+    clearProgress();
     setExistingAssessment(null);
     setCurrentQuestion(0);
     setAnswers({});
     setIsCompleted(false);
-    setAssessmentId(crypto.randomUUID());
+    const newId = crypto.randomUUID();
+    setAssessmentId(newId);
+    saveProgress(newId, 0, {});
+  };
+
+  const resumeAssessment = () => {
+    const saved = loadSavedProgress();
+    if (!saved) return;
+    setExistingAssessment(null);
+    setAssessmentId(saved.assessmentId);
+    setCurrentQuestion(saved.currentQuestion);
+    setAnswers(saved.answers);
+    setIsCompleted(false);
   };
 
   const handleAnswer = (value: string) => {
-    setAnswers({ ...answers, [currentQuestion]: parseInt(value) });
+    const updated = { ...answers, [currentQuestion]: parseInt(value) };
+    setAnswers(updated);
+    if (assessmentId) saveProgress(assessmentId, currentQuestion, updated);
   };
 
   const handleNext = () => {
     if (currentQuestion < allQuestions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+      const next = currentQuestion + 1;
+      setCurrentQuestion(next);
+      if (assessmentId) saveProgress(assessmentId, next, answers);
     } else {
       finishAssessment();
     }
@@ -217,7 +268,9 @@ const Assessment = () => {
 
   const handlePrevious = () => {
     if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
+      const prev = currentQuestion - 1;
+      setCurrentQuestion(prev);
+      if (assessmentId) saveProgress(assessmentId, prev, answers);
     }
   };
 
@@ -255,6 +308,7 @@ const Assessment = () => {
         setShowAchievementNotification(true);
       }
 
+      clearProgress();
       setIsCompleted(true);
       toast.success("Evaluación guardada exitosamente");
     } catch (error) {
@@ -321,34 +375,88 @@ const Assessment = () => {
           </p>
         </div>
 
-        {existingAssessment && (
-          <Card className="border-accent">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CheckCircle2 className="h-5 w-5 text-accent" />
-                Evaluación Anterior
-              </CardTitle>
-              <CardDescription>
-                Completada el{" "}
-                {new Date(existingAssessment.completed_at).toLocaleDateString("es-ES")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="text-3xl font-bold text-primary">
-                  {Math.round(
-                    (existingAssessment.correct_answers / existingAssessment.total_questions) * 100
-                  )}
-                  %
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {existingAssessment.correct_answers} de {existingAssessment.total_questions}{" "}
-                  respuestas correctas
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {existingAssessment && (() => {
+          const globalPct = Math.round(
+            (existingAssessment.correct_answers / existingAssessment.total_questions) * 100
+          );
+          const sectionResults = existingAssessment.results as
+            | { [key: string]: { correct: number; total: number; percentage?: number } }
+            | null;
+
+          return (
+            <>
+              <Card className="border-accent">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CheckCircle2 className="h-5 w-5 text-accent" />
+                    Evaluación Anterior
+                  </CardTitle>
+                  <CardDescription>
+                    Completada el{" "}
+                    {new Date(existingAssessment.completed_at).toLocaleDateString("es-ES")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl font-bold text-primary">{globalPct}%</div>
+                    <div className="text-sm text-muted-foreground">
+                      {existingAssessment.correct_answers} de {existingAssessment.total_questions}{" "}
+                      respuestas correctas
+                    </div>
+                  </div>
+                  <Progress value={globalPct} className="h-3" />
+                </CardContent>
+              </Card>
+
+              {sectionResults && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Resultados por Módulo</CardTitle>
+                    <CardDescription>Detalle de aciertos e incorrectas en cada sección</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {SECTIONS.map((section) => {
+                        const data = sectionResults[section.id];
+                        if (!data) return null;
+                        const pct = data.percentage ?? Math.round((data.correct / data.total) * 100);
+                        const incorrect = data.total - data.correct;
+                        return (
+                          <div key={section.id} className="rounded-lg border p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <section.icon className="h-5 w-5 text-primary" />
+                                <span className="font-medium text-foreground">{section.name}</span>
+                              </div>
+                              <Badge
+                                variant={pct >= 70 ? "default" : pct >= 50 ? "secondary" : "destructive"}
+                              >
+                                {pct}%
+                              </Badge>
+                            </div>
+                            <Progress value={pct} className="h-2" />
+                            <div className="flex gap-4 text-sm">
+                              <span className="flex items-center gap-1 text-green-600">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {data.correct} correctas
+                              </span>
+                              <span className="flex items-center gap-1 text-red-500">
+                                ✕ {incorrect} incorrectas
+                              </span>
+                              <span className="text-muted-foreground ml-auto">
+                                {data.correct}/{data.total} preguntas
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+        })()}
 
         <Card>
           <CardHeader>
@@ -372,13 +480,41 @@ const Assessment = () => {
                 </div>
               ))}
             </div>
+            {hasSavedProgress && canTakeAssessment && (() => {
+              const saved = loadSavedProgress();
+              const answeredCount = saved ? Object.keys(saved.answers).length : 0;
+              return (
+                <div className="mt-6 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Evaluación en progreso</p>
+                      <p className="text-sm text-muted-foreground">
+                        {answeredCount} de {allQuestions.length} preguntas respondidas
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="border-primary text-primary">
+                      {Math.round((answeredCount / allQuestions.length) * 100)}%
+                    </Badge>
+                  </div>
+                  <Progress value={(answeredCount / allQuestions.length) * 100} className="h-2" />
+                  <div className="flex gap-2">
+                    <Button onClick={resumeAssessment} className="flex-1">
+                      Continuar Evaluación
+                    </Button>
+                    <Button variant="outline" onClick={() => { clearProgress(); }} className="flex-1">
+                      Descartar
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
             <Button
               onClick={startNewAssessment}
-              className="mt-6 w-full"
+              className="mt-4 w-full"
               disabled={!canTakeAssessment || loadingPermissions}
             >
               {loadingPermissions ? "Cargando..." : (
-                existingAssessment ? "Realizar Nueva Evaluación" : "Comenzar Evaluación"
+                hasSavedProgress ? "Comenzar de Nuevo" : (existingAssessment ? "Realizar Nueva Evaluación" : "Comenzar Evaluación")
               )}
             </Button>
             {!canTakeAssessment && !loadingPermissions && (
