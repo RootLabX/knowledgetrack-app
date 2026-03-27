@@ -31,9 +31,9 @@ interface Question {
 }
 
 const SECTIONS = [
-  { id: "cloud-concepts", name: "Conceptos de la Nube", icon: Cloud, questionCount: 9 },
-  { id: "azure-services", name: "Arquitectura y Servicios de Azure", icon: Server, questionCount: 12 },
-  { id: "management-governance", name: "Administración y Gobernanza", icon: Shield, questionCount: 9 },
+  { id: "cloud-concepts", name: "Conceptos de la Nube", icon: Cloud, questionCount: 8 },
+  { id: "azure-services", name: "Arquitectura y Servicios de Azure", icon: Server, questionCount: 10 },
+  { id: "management-governance", name: "Administración y Gobernanza", icon: Shield, questionCount: 7 },
 ];
 
 const EXAM_TIME_MINUTES = 40;
@@ -49,9 +49,8 @@ const allQuestions: Question[] = [
   { id: 6, category: "Cloud Concepts", section: "cloud-concepts", question: "¿Cuál de los siguientes es un ejemplo de nube híbrida?", options: ["Usar solo Azure para todos los servicios", "Combinar un centro de datos local con servicios en la nube pública", "Usar dos proveedores de nube pública diferentes", "Ejecutar aplicaciones solo en servidores locales"], correctAnswer: 1 },
   { id: 7, category: "Cloud Concepts", section: "cloud-concepts", question: "En el modelo IaaS, ¿qué gestiona el cliente?", options: ["Solo los datos", "El sistema operativo, middleware, aplicaciones y datos", "Solo el hardware físico", "Nada, todo lo gestiona el proveedor"], correctAnswer: 1 },
   { id: 8, category: "Cloud Concepts", section: "cloud-concepts", question: "¿Qué acuerdo define el tiempo de actividad garantizado de un servicio en Azure?", options: ["NDA (Non-Disclosure Agreement)", "SLA (Service Level Agreement)", "TOS (Terms of Service)", "MOU (Memorandum of Understanding)"], correctAnswer: 1 },
-  { id: 9, category: "Cloud Concepts", section: "cloud-concepts", question: "¿Qué beneficio de la nube permite que los servicios se recuperen automáticamente de fallos?", options: ["Escalabilidad", "Elasticidad", "Tolerancia a fallos", "Agilidad"], correctAnswer: 2 },
 
-  // ARQUITECTURA Y SERVICIOS DE AZURE (12 preguntas)
+  // ARQUITECTURA Y SERVICIOS DE AZURE (10 preguntas)
   { id: 10, category: "Azure Services", section: "azure-services", question: "¿Qué es una región de Azure?", options: ["Un único centro de datos de Azure", "Un conjunto de centros de datos conectados por una red de baja latencia dentro de un área geográfica", "El nombre comercial de un servicio de Azure", "Una suscripción de Azure"], correctAnswer: 1 },
   { id: 11, category: "Azure Services", section: "azure-services", question: "¿Qué servicio de Azure se utiliza para ejecutar máquinas virtuales?", options: ["Azure App Service", "Azure Functions", "Azure Virtual Machines", "Azure Logic Apps"], correctAnswer: 2 },
   { id: 12, category: "Azure Services", section: "azure-services", question: "¿Cuál es el propósito de Azure Blob Storage?", options: ["Almacenar bases de datos relacionales", "Almacenar grandes cantidades de datos no estructurados como texto o binarios", "Ejecutar contenedores Docker", "Gestionar redes virtuales"], correctAnswer: 1 },
@@ -59,13 +58,11 @@ const allQuestions: Question[] = [
   { id: 14, category: "Azure Services", section: "azure-services", question: "¿Qué es Azure Virtual Network (VNet)?", options: ["Un servicio de almacenamiento en la nube", "Una representación de tu propia red en la nube que permite la comunicación entre recursos de Azure", "Un servicio de base de datos", "Una herramienta de monitoreo"], correctAnswer: 1 },
   { id: 15, category: "Azure Services", section: "azure-services", question: "¿Qué servicio de base de datos de Azure es compatible con PostgreSQL, MySQL y MariaDB?", options: ["Azure Cosmos DB", "Azure SQL Database", "Azure Database for PostgreSQL/MySQL/MariaDB", "Azure Table Storage"], correctAnswer: 2 },
   { id: 16, category: "Azure Services", section: "azure-services", question: "¿Qué son las Availability Zones en Azure?", options: ["Regiones geográficas separadas", "Ubicaciones físicamente separadas dentro de una región de Azure, cada una con alimentación, refrigeración y redes independientes", "Diferentes suscripciones de Azure", "Tipos de máquinas virtuales"], correctAnswer: 1 },
-  { id: 17, category: "Azure Services", section: "azure-services", question: "¿Qué servicio de Azure permite ejecutar contenedores sin gestionar servidores?", options: ["Azure Virtual Machines", "Azure Container Instances", "Azure Dedicated Host", "Azure Batch"], correctAnswer: 1 },
   { id: 18, category: "Azure Services", section: "azure-services", question: "¿Para qué se utiliza Azure ExpressRoute?", options: ["Enviar correos electrónicos", "Crear una conexión privada dedicada entre tu infraestructura local y Azure (sin pasar por Internet)", "Almacenar archivos en la nube", "Monitorear aplicaciones"], correctAnswer: 1 },
   { id: 19, category: "Azure Services", section: "azure-services", question: "¿Qué es Azure Cosmos DB?", options: ["Una base de datos relacional", "Una base de datos NoSQL distribuida globalmente con múltiples modelos de consistencia", "Un servicio de almacenamiento de archivos", "Una herramienta de DevOps"], correctAnswer: 1 },
   { id: 20, category: "Azure Services", section: "azure-services", question: "¿Cuál es la función de Azure App Service?", options: ["Gestionar máquinas virtuales", "Hospedar aplicaciones web, APIs REST y back-ends móviles sin gestionar infraestructura", "Almacenar datos en blobs", "Crear redes virtuales"], correctAnswer: 1 },
-  { id: 21, category: "Azure Services", section: "azure-services", question: "¿Qué servicio de Azure proporciona un balanceo de carga global basado en DNS?", options: ["Azure Load Balancer", "Azure Application Gateway", "Azure Traffic Manager", "Azure Front Door"], correctAnswer: 2 },
 
-  // ADMINISTRACIÓN Y GOBERNANZA (9 preguntas)
+  // ADMINISTRACIÓN Y GOBERNANZA (7 preguntas)
   { id: 22, category: "Management & Governance", section: "management-governance", question: "¿Qué herramienta de Azure permite gestionar recursos mediante una interfaz de línea de comandos?", options: ["Azure Portal", "Azure CLI", "Azure Advisor", "Azure Monitor"], correctAnswer: 1 },
   { id: 23, category: "Management & Governance", section: "management-governance", question: "¿Cuál es el propósito de Azure Resource Manager (ARM)?", options: ["Monitorear el rendimiento de las aplicaciones", "Proporcionar una capa de administración para crear, actualizar y eliminar recursos en Azure", "Almacenar secretos y claves", "Balancear la carga de tráfico"], correctAnswer: 1 },
   { id: 24, category: "Management & Governance", section: "management-governance", question: "¿Qué herramienta de Azure proporciona recomendaciones personalizadas para optimizar costos, seguridad y rendimiento?", options: ["Azure Monitor", "Azure Advisor", "Azure Policy", "Azure Blueprints"], correctAnswer: 1 },
@@ -73,8 +70,6 @@ const allQuestions: Question[] = [
   { id: 26, category: "Management & Governance", section: "management-governance", question: "¿Qué es Azure Policy?", options: ["Un servicio de base de datos", "Un servicio que permite crear, asignar y gestionar directivas que aplican reglas y efectos sobre los recursos", "Una herramienta para desplegar máquinas virtuales", "Un servicio de mensajería"], correctAnswer: 1 },
   { id: 27, category: "Management & Governance", section: "management-governance", question: "¿Cuál es la función principal de la Calculadora de Precios de Azure?", options: ["Facturar automáticamente los servicios usados", "Estimar el costo de los servicios de Azure antes de implementarlos", "Monitorear el uso de recursos en tiempo real", "Crear presupuestos automáticos"], correctAnswer: 1 },
   { id: 28, category: "Management & Governance", section: "management-governance", question: "¿Qué servicio de Azure permite almacenar y gestionar de forma segura secretos, claves y certificados?", options: ["Azure Active Directory", "Azure Information Protection", "Azure Key Vault", "Azure Security Center"], correctAnswer: 2 },
-  { id: 29, category: "Management & Governance", section: "management-governance", question: "¿Qué es Microsoft Entra ID (antes Azure Active Directory)?", options: ["Un servicio de almacenamiento", "Un servicio de identidad y acceso basado en la nube para gestionar usuarios y permisos", "Un servicio de máquinas virtuales", "Una base de datos relacional"], correctAnswer: 1 },
-  { id: 30, category: "Management & Governance", section: "management-governance", question: "¿Para qué se utilizan las etiquetas (tags) en los recursos de Azure?", options: ["Para encriptar los datos", "Para organizar recursos con metadatos de nombre-valor para gestión, facturación y automatización", "Para crear copias de seguridad automáticas", "Para habilitar el acceso público a los recursos"], correctAnswer: 1 },
 ];
 
 const AzureFundamentals = () => {
@@ -391,7 +386,7 @@ const AzureFundamentals = () => {
         <Card>
           <CardHeader>
             <CardTitle>Dominios del Examen AZ-900</CardTitle>
-            <CardDescription>30 preguntas • 40 minutos • Se requiere 70% para aprobar</CardDescription>
+            <CardDescription>25 preguntas • 40 minutos • Se requiere 70% para aprobar</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 md:grid-cols-3">
