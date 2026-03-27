@@ -5,8 +5,10 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   CheckCircle2,
+  ChevronDown,
   Code,
   Database,
   GitBranch,
@@ -16,6 +18,7 @@ import {
   Layout,
   Shield,
   Users,
+  XCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -288,7 +291,7 @@ const Assessment = () => {
           total_questions: results.total,
           correct_answers: results.correct,
           status: "completed",
-          results: results.bySection,
+          results: { bySection: results.bySection, answers },
           completed_at: new Date().toISOString()
         }]);
 
@@ -408,52 +411,125 @@ const Assessment = () => {
                 </CardContent>
               </Card>
 
-              {sectionResults && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Resultados por Módulo</CardTitle>
-                    <CardDescription>Detalle de aciertos e incorrectas en cada sección</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {SECTIONS.map((section) => {
-                        const data = sectionResults[section.id];
-                        if (!data) return null;
-                        const pct = data.percentage ?? Math.round((data.correct / data.total) * 100);
-                        const incorrect = data.total - data.correct;
-                        return (
-                          <div key={section.id} className="rounded-lg border p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <section.icon className="h-5 w-5 text-primary" />
-                                <span className="font-medium text-foreground">{section.name}</span>
+              {sectionResults && (() => {
+                const savedAnswers = (existingAssessment.results as any)?.answers as
+                  | Record<string, number>
+                  | undefined;
+                const legacyBySection = (existingAssessment.results as any)?.bySection;
+                const sectionData = legacyBySection || sectionResults;
+
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Resultados por Módulo</CardTitle>
+                      <CardDescription>
+                        {savedAnswers
+                          ? "Haz clic en cada sección para ver el detalle de cada pregunta"
+                          : "Detalle de aciertos e incorrectas en cada sección"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {SECTIONS.map((section) => {
+                          const data = sectionData[section.id];
+                          if (!data) return null;
+                          const pct = data.percentage ?? Math.round((data.correct / data.total) * 100);
+                          const incorrect = data.total - data.correct;
+                          const sectionQuestions = allQuestions
+                            .map((q, idx) => ({ ...q, globalIndex: idx }))
+                            .filter((q) => q.section === section.id);
+
+                          return (
+                            <Collapsible key={section.id}>
+                              <div className="rounded-lg border p-4 space-y-3">
+                                <CollapsibleTrigger className="w-full" asChild>
+                                  <button className="w-full text-left space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <section.icon className="h-5 w-5 text-primary" />
+                                        <span className="font-medium text-foreground">{section.name}</span>
+                                        {savedAnswers && (
+                                          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+                                        )}
+                                      </div>
+                                      <Badge
+                                        variant={pct >= 70 ? "default" : pct >= 50 ? "secondary" : "destructive"}
+                                      >
+                                        {pct}%
+                                      </Badge>
+                                    </div>
+                                    <Progress value={pct} className="h-2" />
+                                    <div className="flex gap-4 text-sm">
+                                      <span className="flex items-center gap-1 text-green-600">
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        {data.correct} correctas
+                                      </span>
+                                      <span className="flex items-center gap-1 text-red-500">
+                                        <XCircle className="h-3.5 w-3.5" />
+                                        {incorrect} incorrectas
+                                      </span>
+                                      <span className="text-muted-foreground ml-auto">
+                                        {data.correct}/{data.total} preguntas
+                                      </span>
+                                    </div>
+                                  </button>
+                                </CollapsibleTrigger>
+
+                                {savedAnswers && (
+                                  <CollapsibleContent>
+                                    <div className="mt-3 border-t pt-3 space-y-3">
+                                      {sectionQuestions.map((q) => {
+                                        const userAnswer = savedAnswers[String(q.globalIndex)];
+                                        const isCorrect = userAnswer === q.correctAnswer;
+                                        return (
+                                          <div
+                                            key={q.id}
+                                            className={`rounded-md p-3 text-sm ${
+                                              isCorrect
+                                                ? "bg-green-50 border border-green-200"
+                                                : "bg-red-50 border border-red-200"
+                                            }`}
+                                          >
+                                            <div className="flex items-start gap-2">
+                                              {isCorrect ? (
+                                                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                                              ) : (
+                                                <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                                              )}
+                                              <div className="flex-1 space-y-1">
+                                                <p className="font-medium text-foreground">{q.question}</p>
+                                                {!isCorrect && (
+                                                  <>
+                                                    <p className="text-red-600">
+                                                      Tu respuesta: {userAnswer !== undefined ? q.options[userAnswer] : "Sin responder"}
+                                                    </p>
+                                                    <p className="text-green-700">
+                                                      Correcta: {q.options[q.correctAnswer]}
+                                                    </p>
+                                                  </>
+                                                )}
+                                                {isCorrect && (
+                                                  <p className="text-green-700">
+                                                    {q.options[q.correctAnswer]}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </CollapsibleContent>
+                                )}
                               </div>
-                              <Badge
-                                variant={pct >= 70 ? "default" : pct >= 50 ? "secondary" : "destructive"}
-                              >
-                                {pct}%
-                              </Badge>
-                            </div>
-                            <Progress value={pct} className="h-2" />
-                            <div className="flex gap-4 text-sm">
-                              <span className="flex items-center gap-1 text-green-600">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                {data.correct} correctas
-                              </span>
-                              <span className="flex items-center gap-1 text-red-500">
-                                ✕ {incorrect} incorrectas
-                              </span>
-                              <span className="text-muted-foreground ml-auto">
-                                {data.correct}/{data.total} preguntas
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                            </Collapsible>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </>
           );
         })()}

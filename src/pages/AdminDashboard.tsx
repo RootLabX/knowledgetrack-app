@@ -55,6 +55,14 @@ interface AssessmentSection {
   avgScore: number;
 }
 
+interface MemberSectionScore {
+  memberId: string;
+  memberName: string;
+  department: string;
+  globalScore: number;
+  sections: { [sectionId: string]: number };
+}
+
 interface DashboardStats {
   totalUsers: number;
   totalCourses: number;
@@ -66,6 +74,7 @@ interface DashboardStats {
   teamMembers: TeamMemberDetail[];
   sectionStats: AssessmentSection[];
   courseProgress: { title: string; assigned: number; completed: number; avgProgress: number }[];
+  memberScores: MemberSectionScore[];
 }
 
 const SECTION_NAMES: { [key: string]: string } = {
@@ -94,6 +103,7 @@ const AdminDashboard = () => {
     teamMembers: [],
     sectionStats: [],
     courseProgress: [],
+    memberScores: [],
   });
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -135,35 +145,42 @@ const AdminDashboard = () => {
 
       // Fetch courses
       const { data: courses, error: coursesError } = await supabase
+        .schema("mapper")
         .from("courses")
-        .select("*")
-        .schema("mapper");
+        .select("*");
 
       if (coursesError) throw coursesError;
 
       // Fetch user courses
       const { data: userCourses, error: userCoursesError } = await supabase
+        .schema("mapper")
         .from("user_courses")
-        .select("*")
-        .schema("mapper");
+        .select("*");
 
       if (userCoursesError) throw userCoursesError;
 
       // Fetch assessments
       const { data: assessments, error: assessmentsError } = await supabase
+        .schema("mapper")
         .from("assessments")
-        .select("*")
-        .schema("mapper");
+        .select("*");
 
       if (assessmentsError) throw assessmentsError;
+
+      const parseSectionResults = (raw: any): { [key: string]: { correct: number; total: number } } | null => {
+        if (!raw) return null;
+        if (raw.bySection) return raw.bySection;
+        if (typeof raw === 'object' && !raw.answers) return raw;
+        return null;
+      };
 
       // Process assessments for section stats
       const sectionMap: { [key: string]: { total: number; correct: number } } = {};
 
       (assessments || []).forEach((assessment) => {
         if (assessment.status === 'completed' && assessment.results) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const results = assessment.results as { [key: string]: { correct: number; total: number } };
+          const results = parseSectionResults(assessment.results);
+          if (!results) return;
           Object.entries(results).forEach(([section, data]) => {
             if (!sectionMap[section]) {
               sectionMap[section] = { total: 0, correct: 0 };
@@ -190,14 +207,14 @@ const AdminDashboard = () => {
           (a) => a.user_id === profile.id && a.status === "completed"
         );
 
-        // Parse results to find knowledge gaps
         let knowledgeGaps: string[] = [];
         if (memberAssessment?.results) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const results = memberAssessment.results as { [key: string]: { correct: number; total: number } };
-          knowledgeGaps = Object.entries(results)
-            .filter(([, data]) => data.total > 0 && (data.correct / data.total) < 0.6)
-            .map(([section]) => section);
+          const results = parseSectionResults(memberAssessment.results);
+          if (results) {
+            knowledgeGaps = Object.entries(results)
+              .filter(([, data]) => data.total > 0 && (data.correct / data.total) < 0.6)
+              .map(([section]) => section);
+          }
         }
 
         return {
@@ -236,6 +253,35 @@ const AdminDashboard = () => {
         };
       });
 
+      // Build member scores for roadmap
+      const memberScores: MemberSectionScore[] = (profiles || [])
+        .map((profile) => {
+          const memberAssessment = (assessments || []).find(
+            (a) => a.user_id === profile.id && a.status === "completed"
+          );
+          if (!memberAssessment?.results) return null;
+          const sResults = parseSectionResults(memberAssessment.results);
+          if (!sResults) return null;
+
+          const sections: { [key: string]: number } = {};
+          Object.entries(sResults).forEach(([sId, d]) => {
+            sections[sId] = d.total > 0 ? Math.round((d.correct / d.total) * 100) : 0;
+          });
+          const globalScore =
+            memberAssessment.total_questions > 0
+              ? Math.round((memberAssessment.correct_answers / memberAssessment.total_questions) * 100)
+              : 0;
+
+          return {
+            memberId: profile.id,
+            memberName: profile.full_name || "Sin nombre",
+            department: profile.department || "—",
+            globalScore,
+            sections,
+          } as MemberSectionScore;
+        })
+        .filter(Boolean) as MemberSectionScore[];
+
       // Calculate assessment stats
       const completedAssessments = (assessments || []).filter((a) => a.status === "completed");
       const avgScore =
@@ -259,6 +305,7 @@ const AdminDashboard = () => {
         teamMembers,
         sectionStats,
         courseProgress,
+        memberScores,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -421,10 +468,14 @@ const AdminDashboard = () => {
       />
 
       <Tabs defaultValue="team" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-none lg:flex">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="team" className="gap-2">
             <Users className="h-4 w-4" />
             Equipo
+          </TabsTrigger>
+          <TabsTrigger value="roadmap" className="gap-2">
+            <Target className="h-4 w-4" />
+            Roadmap
           </TabsTrigger>
           <TabsTrigger value="assessments" className="gap-2">
             <Brain className="h-4 w-4" />
@@ -527,6 +578,237 @@ const AdminDashboard = () => {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Roadmap Tab */}
+        <TabsContent value="roadmap" className="space-y-4">
+          {stats.memberScores.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Target className="mb-4 h-12 w-12 text-muted-foreground" />
+                <p className="font-medium text-foreground">No hay evaluaciones completadas</p>
+                <p className="text-sm text-muted-foreground">
+                  El roadmap se generará cuando los miembros completen sus evaluaciones
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Heatmap */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <LineChart className="h-5 w-5 text-primary" />
+                    Mapa de Competencias del Equipo
+                  </CardTitle>
+                  <CardDescription>
+                    Puntaje de cada miembro por área de conocimiento. Rojo = brecha, Amarillo = intermedio, Verde = fortaleza.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="sticky left-0 bg-background z-10 min-w-[160px]">Miembro</TableHead>
+                        <TableHead className="text-center min-w-[80px]">Global</TableHead>
+                        {Object.keys(SECTION_NAMES).map((sId) => (
+                          <TableHead key={sId} className="text-center min-w-[80px]">
+                            <span className="text-xs">{SECTION_NAMES[sId]}</span>
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.memberScores.map((m) => (
+                        <TableRow key={m.memberId}>
+                          <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                            <div>
+                              <p className="text-sm">{m.memberName}</p>
+                              <p className="text-xs text-muted-foreground">{m.department}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-bold ${getScoreColor(m.globalScore)}`}>
+                              {m.globalScore}%
+                            </span>
+                          </TableCell>
+                          {Object.keys(SECTION_NAMES).map((sId) => {
+                            const score = m.sections[sId];
+                            const bg = score === undefined
+                              ? "bg-gray-100 text-gray-400"
+                              : score >= 70
+                                ? "bg-green-100 text-green-800"
+                                : score >= 50
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800";
+                            return (
+                              <TableCell key={sId} className="text-center p-1">
+                                <span className={`inline-block rounded-md px-2 py-1 text-xs font-semibold ${bg}`}>
+                                  {score !== undefined ? `${score}%` : "—"}
+                                </span>
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Roadmap recomendaciones */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                      Prioridades de Capacitación
+                    </CardTitle>
+                    <CardDescription>Áreas donde más miembros tienen brechas (&lt;60%)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const gapCount: { [sId: string]: { count: number; members: string[] } } = {};
+                      stats.memberScores.forEach((m) => {
+                        Object.entries(m.sections).forEach(([sId, score]) => {
+                          if (score < 60) {
+                            if (!gapCount[sId]) gapCount[sId] = { count: 0, members: [] };
+                            gapCount[sId].count++;
+                            gapCount[sId].members.push(m.memberName);
+                          }
+                        });
+                      });
+                      const sorted = Object.entries(gapCount).sort(([, a], [, b]) => b.count - a.count);
+
+                      return sorted.length === 0 ? (
+                        <div className="flex flex-col items-center py-6 text-center">
+                          <CheckCircle2 className="mb-2 h-8 w-8 text-green-500" />
+                          <p className="text-sm text-muted-foreground">Sin brechas críticas en el equipo</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {sorted.map(([sId, data]) => (
+                            <div key={sId} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-sm">{SECTION_NAMES[sId] || sId}</span>
+                                <Badge variant="destructive">{data.count} miembros</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {data.members.join(", ")}
+                              </p>
+                              <Progress value={(data.count / stats.memberScores.length) * 100} className="h-2" />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-green-500" />
+                      Roadmap Sugerido
+                    </CardTitle>
+                    <CardDescription>Plan de acción basado en las brechas del equipo</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const avgBySection: { sId: string; avg: number }[] = Object.keys(SECTION_NAMES).map((sId) => {
+                        const scores = stats.memberScores
+                          .map((m) => m.sections[sId])
+                          .filter((s) => s !== undefined) as number[];
+                        const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : -1;
+                        return { sId, avg };
+                      }).filter((s) => s.avg >= 0).sort((a, b) => a.avg - b.avg);
+
+                      return (
+                        <div className="space-y-3">
+                          {avgBySection.map((item, idx) => {
+                            const priority = item.avg < 50 ? "Alta" : item.avg < 70 ? "Media" : "Baja";
+                            const priorityColor = item.avg < 50 ? "destructive" : item.avg < 70 ? "secondary" : "outline";
+                            return (
+                              <div key={item.sId} className="flex items-center gap-3 rounded-lg border p-3">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                  {idx + 1}
+                                </span>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{SECTION_NAMES[item.sId]}</p>
+                                  <p className="text-xs text-muted-foreground">Promedio equipo: {item.avg}%</p>
+                                </div>
+                                <Badge variant={priorityColor as any}>Prioridad {priority}</Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Detalle individual */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Detalle Individual - Áreas a Reforzar
+                  </CardTitle>
+                  <CardDescription>
+                    Secciones por debajo del 60% para cada miembro del equipo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {stats.memberScores.map((m) => {
+                      const gaps = Object.entries(m.sections)
+                        .filter(([, score]) => score < 60)
+                        .sort(([, a], [, b]) => a - b);
+                      return (
+                        <div key={m.memberId} className="rounded-lg border p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                  {getInitials(m.memberName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium text-sm">{m.memberName}</p>
+                                <p className="text-xs text-muted-foreground">{m.department}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className={getScoreColor(m.globalScore)}>
+                              {m.globalScore}% global
+                            </Badge>
+                          </div>
+                          {gaps.length === 0 ? (
+                            <p className="text-sm text-green-600 flex items-center gap-1">
+                              <CheckCircle2 className="h-4 w-4" /> Sin brechas significativas
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {gaps.map(([sId, score]) => (
+                                <div key={sId} className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-1.5">
+                                  <span className="text-xs font-medium text-red-800">
+                                    {SECTION_NAMES[sId] || sId}
+                                  </span>
+                                  <Badge variant="destructive" className="text-xs h-5">
+                                    {score}%
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Assessments Tab */}

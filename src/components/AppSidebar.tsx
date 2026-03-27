@@ -4,6 +4,7 @@ import {
   ChartBar,
   BookOpen,
   Brain,
+  Cloud,
   GraduationCap,
   Home,
   LayoutDashboard,
@@ -29,6 +30,7 @@ import {
 const mainNavItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Evaluaciones", url: "/assessment", icon: Brain },
+  { title: "AZ-900 Practice", url: "/azure-fundamentals", icon: Cloud },
   { title: "Objetivos", url: "/objectives", icon: Target },
   { title: "Cursos", url: "/courses", icon: BookOpen },
   { title: "Planificación", url: "/planning", icon: Target },
