@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Achievements from "./pages/Achievements";
 import Analytics from "./pages/Analytics";
 import AzureFundamentals from "./pages/AzureFundamentals";
+import AzureFundamentalsExam2 from "./pages/AzureFundamentalsExam2";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import SprintBoard from "./pages/SprintBoard";
@@ -122,6 +123,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AzureFundamentals />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/azure-fundamentals-2"
+              element={
+                <ProtectedRoute>
+                  <AzureFundamentalsExam2 />
                 </ProtectedRoute>
               }
             />

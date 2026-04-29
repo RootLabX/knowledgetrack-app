@@ -90,6 +90,7 @@ const Objectives = () => {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState("general");
     const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
+    const [selectedQuarter, setSelectedQuarter] = useState<1|2|3|4>(1);
 
     // View Details State
     const [viewObjective, setViewObjective] = useState<StrategicObjective | null>(null);
@@ -783,52 +784,183 @@ const Objectives = () => {
                     </div>
                 </TabsContent>
 
-                <TabsContent value="report">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <BarChart3 className="h-5 w-5 text-primary" />
-                                Cumplimiento Trimestral de Objetivos ({new Date().getFullYear()})
-                                {userProfile?.department && <span className="text-sm font-normal text-muted-foreground ml-2">({userProfile.department})</span>}
-                            </CardTitle>
-                            <CardDescription>
-                                Promedio de avance de los KPIs agrupados por trimestre de vencimiento.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="h-[400px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={quarterlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis domain={[0, 100]} unit="%" />
-                                    <Tooltip
-                                        formatter={(value: number) => [`${value}% `, 'Cumplimiento Promedio']}
-                                        labelStyle={{ color: 'black' }}
-                                    />
-                                    <Bar dataKey="cumplimiento" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Cumplimiento %" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
+                <TabsContent value="report" className="space-y-6 mt-6">
+                    {(() => {
+                        const currentYear = new Date().getFullYear();
 
-                    <div className="grid gap-4 md:grid-cols-4 mt-6">
-                        {quarterlyData.map((q) => (
-                            <Card key={q.name}>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                                        {q.name}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{q.cumplimiento}%</div>
-                                    <p className="text-xs text-muted-foreground">
-                                        {q.objetivos} objetivos programados
-                                    </p>
-                                    <Progress value={q.cumplimiento} className="h-2 mt-2" />
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                        const quarterObjectives = (filteredObjectives || []).filter(obj => {
+                            const d = new Date(obj.deadline);
+                            return getYear(d) === currentYear && getQuarter(d) === selectedQuarter;
+                        });
+
+                        const totalObjs = quarterObjectives.length;
+                        const completedObjs = quarterObjectives.filter(o => calculateProgress(o.kpi_current, o.kpi_target) >= 100).length;
+                        const inProgressObjs = quarterObjectives.filter(o => {
+                            const p = calculateProgress(o.kpi_current, o.kpi_target);
+                            return p > 0 && p < 100;
+                        }).length;
+                        const notStartedObjs = quarterObjectives.filter(o => calculateProgress(o.kpi_current, o.kpi_target) === 0).length;
+                        const avgProgress = totalObjs > 0
+                            ? Math.round(quarterObjectives.reduce((acc, o) => acc + calculateProgress(o.kpi_current, o.kpi_target), 0) / totalObjs)
+                            : 0;
+
+                        const quarterNames: Record<number, string> = { 1: "T1 (Ene - Mar)", 2: "T2 (Abr - Jun)", 3: "T3 (Jul - Sep)", 4: "T4 (Oct - Dic)" };
+
+                        return (
+                            <>
+                                {/* Quarter selector */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-xl font-bold">Reporte de Indicadores - {quarterNames[selectedQuarter]} {currentYear}</h2>
+                                        <p className="text-muted-foreground text-sm">KPIs y estado de cumplimiento del trimestre</p>
+                                    </div>
+                                    <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v) as 1|2|3|4)}>
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">T1 (Ene - Mar)</SelectItem>
+                                            <SelectItem value="2">T2 (Abr - Jun)</SelectItem>
+                                            <SelectItem value="3">T3 (Jul - Sep)</SelectItem>
+                                            <SelectItem value="4">T4 (Oct - Dic)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Summary cards */}
+                                <div className="grid gap-4 md:grid-cols-5">
+                                    <Card>
+                                        <CardContent className="pt-6 text-center">
+                                            <p className="text-3xl font-bold text-primary">{totalObjs}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Total Objetivos</p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card>
+                                        <CardContent className="pt-6 text-center">
+                                            <p className="text-3xl font-bold text-green-500">{completedObjs}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Completados</p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card>
+                                        <CardContent className="pt-6 text-center">
+                                            <p className="text-3xl font-bold text-yellow-500">{inProgressObjs}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">En Progreso</p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card>
+                                        <CardContent className="pt-6 text-center">
+                                            <p className="text-3xl font-bold text-red-500">{notStartedObjs}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Sin Iniciar</p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card>
+                                        <CardContent className="pt-6 text-center">
+                                            <p className="text-3xl font-bold">{avgProgress}%</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Cumplimiento Prom.</p>
+                                            <Progress value={avgProgress} className="h-2 mt-2" />
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Chart */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-lg">
+                                            <BarChart3 className="h-5 w-5 text-primary" />
+                                            Cumplimiento Anual por Trimestre
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="h-[300px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={quarterlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="name" />
+                                                <YAxis domain={[0, 100]} unit="%" />
+                                                <Tooltip formatter={(value: number) => [`${value}%`, 'Cumplimiento']} />
+                                                <Bar dataKey="cumplimiento" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Detailed KPI table */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-lg">
+                                            <Target className="h-5 w-5 text-primary" />
+                                            Detalle de KPIs - {quarterNames[selectedQuarter]}
+                                        </CardTitle>
+                                        <CardDescription>Indicadores individuales con progreso y estado</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {quarterObjectives.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                                <Target className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                                                <p className="font-medium">No hay objetivos para este trimestre</p>
+                                                <p className="text-sm text-muted-foreground">Crea objetivos con fecha límite en {quarterNames[selectedQuarter]}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {quarterObjectives
+                                                    .sort((a, b) => calculateProgress(a.kpi_current, a.kpi_target) - calculateProgress(b.kpi_current, b.kpi_target))
+                                                    .map((obj) => {
+                                                        const progress = calculateProgress(obj.kpi_current, obj.kpi_target);
+                                                        const isCompleted = progress >= 100;
+                                                        const deptName = departments?.find(d => d.id === obj.department_id)?.name;
+                                                        const daysLeft = Math.ceil((new Date(obj.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                                                        const isOverdue = daysLeft < 0 && !isCompleted;
+
+                                                        return (
+                                                            <div key={obj.id} className={`rounded-lg border p-4 space-y-3 ${isOverdue ? "border-red-300 bg-red-50/50" : isCompleted ? "border-green-300 bg-green-50/50" : ""}`}>
+                                                                <div className="flex items-start justify-between gap-4">
+                                                                    <div className="flex-1">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <h4 className="font-semibold text-foreground">{obj.title}</h4>
+                                                                            {deptName && <Badge variant="outline" className="text-xs">{deptName}</Badge>}
+                                                                            {isOverdue && <Badge variant="destructive" className="text-xs">Vencido</Badge>}
+                                                                            {isCompleted && <Badge className="bg-green-600 text-xs">Completado</Badge>}
+                                                                        </div>
+                                                                        {obj.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{obj.description}</p>}
+                                                                    </div>
+                                                                    <div className="text-right shrink-0">
+                                                                        <p className={`text-2xl font-bold ${isCompleted ? "text-green-500" : progress > 0 ? "text-primary" : "text-red-500"}`}>
+                                                                            {Math.round(progress)}%
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <Progress value={progress} className="h-2.5" />
+
+                                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                                                    <div className="bg-muted/30 rounded-md p-2">
+                                                                        <p className="text-xs text-muted-foreground">KPI</p>
+                                                                        <p className="font-medium">{obj.kpi_metric}</p>
+                                                                    </div>
+                                                                    <div className="bg-muted/30 rounded-md p-2">
+                                                                        <p className="text-xs text-muted-foreground">Actual / Meta</p>
+                                                                        <p className="font-medium">{obj.kpi_current} / {obj.kpi_target} {obj.kpi_unit}</p>
+                                                                    </div>
+                                                                    <div className="bg-muted/30 rounded-md p-2">
+                                                                        <p className="text-xs text-muted-foreground">Fecha Límite</p>
+                                                                        <p className="font-medium">{format(new Date(obj.deadline), "dd MMM yyyy", { locale: es })}</p>
+                                                                    </div>
+                                                                    <div className="bg-muted/30 rounded-md p-2">
+                                                                        <p className="text-xs text-muted-foreground">Días Restantes</p>
+                                                                        <p className={`font-medium ${isOverdue ? "text-red-500" : daysLeft <= 15 ? "text-yellow-500" : ""}`}>
+                                                                            {isCompleted ? "✓ Cumplido" : isOverdue ? `${Math.abs(daysLeft)} días vencido` : `${daysLeft} días`}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </>
+                        );
+                    })()}
                 </TabsContent>
             </Tabs>
         </div >

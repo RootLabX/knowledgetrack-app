@@ -4,6 +4,7 @@ import {
   ChartBar,
   BookOpen,
   Brain,
+  ChevronRight,
   Cloud,
   GraduationCap,
   Home,
@@ -16,7 +17,6 @@ import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -24,18 +24,25 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/", icon: Home },
-  { title: "Evaluaciones", url: "/assessment", icon: Brain },
-  { title: "AZ-900 Practice", url: "/azure-fundamentals", icon: Cloud },
   { title: "Objetivos", url: "/objectives", icon: Target },
   { title: "Cursos", url: "/courses", icon: BookOpen },
   { title: "Planificación", url: "/planning", icon: Target },
   { title: "Ruta de Aprendizaje", url: "/learning-path", icon: GraduationCap },
   { title: "Logros", url: "/achievements", icon: Award },
+];
+
+const evaluationSubItems = [
+  { title: "Evaluación Técnica", url: "/assessment" },
+  { title: "AZ-900 Examen 1", url: "/azure-fundamentals" },
+  { title: "AZ-900 Examen 2", url: "/azure-fundamentals-2" },
 ];
 
 const managementItems = [
@@ -47,7 +54,6 @@ const managementItems = [
 ];
 
 export function AppSidebar() {
-
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4">
@@ -82,6 +88,36 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* Evaluaciones collapsible */}
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton className="flex items-center gap-3 rounded-md px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent w-full">
+                      <Brain className="h-4 w-4" />
+                      <span className="flex-1 text-left">Evaluaciones</span>
+                      <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {evaluationSubItems.map((sub) => (
+                        <SidebarMenuSubItem key={sub.url}>
+                          <SidebarMenuSubButton asChild>
+                            <NavLink
+                              to={sub.url}
+                              className="text-sidebar-foreground hover:bg-sidebar-accent"
+                              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            >
+                              <span>{sub.title}</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -108,8 +144,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-
     </Sidebar>
   );
 }
